@@ -15,7 +15,7 @@ class Device:
 @dataclass(frozen=True)
 class Recipe:
     name: str
-    device_id: str  # which device executes it
+    device_category: str  # what kind of device executes it
     cycle_time: int  # seconds per batch
     power_kw: float
     inputs: Dict[str, float]  # material → quantity / batch

@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 from pycode.data_class import Device
-from pycode.rl_factory_main import FactorySim
 
 
-def plot_dashboard(sim: FactorySim) -> None:
+def plot_dashboard(sim) -> None:
     t = sim.hist_time
     fig, axs = plt.subplots(3, 1, figsize=(11, 9),
                             sharex=True, constrained_layout=True)
@@ -44,7 +43,6 @@ def plot_dashboard(sim: FactorySim) -> None:
 
 def draw_topology(
         devices: dict[str, Device],
-        save_path: str = "device_topology.png"
 ) -> None:
     """
     按 category 分列绘图：
@@ -94,14 +92,15 @@ def draw_topology(
     plt.title("Factory Device Topology (column-by-category)")
     plt.axis("off")
     plt.tight_layout()
+    save_path = "../pics/device_topology.png"
     fig.savefig(save_path, dpi=150)
     print(f"Topology image saved to {save_path}")
 
 
-def plot_gantt(sim: FactorySim, recipe_spec) -> None:
+def plot_gantt(sim, recipe_obj_list) -> None:
     """Draw a coloured-bar Gantt chart: each machine-row shows when it ran which recipe."""
     # ---------- colour dictionary ----------
-    recipe_set = {r.name for r in recipe_spec}
+    recipe_set = {r.name for r in recipe_obj_list}
     # cmap = plt.colormaps["tab20"].resampled(len(recipe_set))
     # cmap = cm.get_cmap("tab20", len(recipe_set))
     cmap = plt.colormaps.get_cmap("tab20").resampled(len(recipe_set))

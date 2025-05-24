@@ -29,13 +29,13 @@ class DevRuntime:
         self.state = DevState.RUNNING
         self.t_left = self.recipe.cycle_time
 
-    def tick(self, stock: Dict[str, int]):
+    def tick(self, stock: Dict[str, int], dt: int):
+        """推进 dt 秒；若生产结束（t_left≤0），产出并切到 FINISHED。"""
         if self.state is DevState.RUNNING:
-            self.t_left -= 1
-            if self.t_left == 0:
-                # finish outputs
+            self.t_left -= dt
+            if self.t_left <= 0:
                 for m, q in self.recipe.outputs.items():
                     stock[m] += q
                 self.state = DevState.FINISHED
         elif self.state is DevState.FINISHED:
-            self.state = DevState.IDLE  # ready for next batch
+            self.state = DevState.IDLE

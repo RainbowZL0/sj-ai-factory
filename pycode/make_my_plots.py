@@ -7,7 +7,7 @@ import networkx as nx
 from pycode.data_class import Device
 
 
-def plot_dashboard(sim) -> None:
+def draw_dashboard(sim) -> None:
     t = sim.hist_time
     fig, axs = plt.subplots(3, 1, figsize=(11, 9),
                             sharex=True, constrained_layout=True)
@@ -41,7 +41,7 @@ def plot_dashboard(sim) -> None:
     print(f"status_dashboard image saved to {save_path}")
 
 
-def draw_topology(
+def draw_device_topology(
         devices: dict[str, Device],
 ) -> None:
     """
@@ -97,12 +97,10 @@ def draw_topology(
     print(f"Topology image saved to {save_path}")
 
 
-def plot_gantt(sim, recipe_obj_list) -> None:
+def draw_gantt(sim, recipe_obj_list) -> None:
     """Draw a coloured-bar Gantt chart: each machine-row shows when it ran which recipe."""
     # ---------- colour dictionary ----------
     recipe_set = {r.name for r in recipe_obj_list}
-    # cmap = plt.colormaps["tab20"].resampled(len(recipe_set))
-    # cmap = cm.get_cmap("tab20", len(recipe_set))
     cmap = plt.colormaps.get_cmap("tab20").resampled(len(recipe_set))
 
     color_of = {name: cmap(i) for i, name in enumerate(sorted(recipe_set))}

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Literal
 
-from pycode.data_class import Device, Recipe
+from pycode.data_class import Device, Recipe, Material
 from pycode.dev_runtime import DevState
 from pycode.utils import (
     build_dict_of_dev_id_and_dev_runtime_obj,
@@ -16,8 +16,9 @@ class FactorySim:
             self,
             device_id_and_spec_dict,
             recipe_name_and_spec_dict,
+            init_stock_name_and_spec_dict,
             init_runtime_device_id_and_rcp_name_dict,
-            schedule_mode: Literal["greedy"],
+            schedule_mode: Literal["greedy", "manual"],
             dt=1,
     ):
         """
@@ -45,8 +46,13 @@ class FactorySim:
             rcp_name: Recipe(**rcp_dict)
             for rcp_name, rcp_dict in recipe_name_and_spec_dict.items()
         }
+        # 字典，材料名 -> 材料obj
+        self.runtime_stock_name_and_obj_dict = {
+            mtrl_name: Material(**mtrl_dict)
+            for mtrl_name, mtrl_dict in init_stock_name_and_spec_dict.items()
+        }
         # 字典，设备id -> Runtime
-        self.dev_id_and_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
+        self.dev_id_and_dev_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
             device_id_and_obj_dict=self.device_id_and_obj_dict,
             recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
             runtime_device_id_and_rcp_name_dict=init_runtime_device_id_and_rcp_name_dict,
@@ -56,7 +62,7 @@ class FactorySim:
             recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
         )
 
-        self.stock = defaultdict(float)
+        self.stock = defaultdict(float)  # TODO 用 self.runtime_stock_name_and_obj_dict 替代掉
         self.clock = 0
         self.energy_kwh_used = 0.0
 
@@ -64,18 +70,19 @@ class FactorySim:
         self.hist_time: list[int] = []
         self.hist_energy: list[float] = []
         self.hist_stock: dict[str, list[float]] = defaultdict(list)
-        self.hist_state: dict[str, list[str]] = {id_: [] for id_ in self.dev_id_and_runtime_dict}
+        self.hist_dev_state: dict[str, list[str]] = {id_: [] for id_ in self.dev_id_and_dev_runtime_dict}
 
         """甘特图"""
-        self.hist_recipe: dict[str, list[str | None]] = {id_: [] for id_ in self.dev_id_and_runtime_dict}
+        self.gantt_recipe: dict[str, list[str | None]] = {id_: [] for id_ in self.dev_id_and_dev_runtime_dict}
 
     def apply_actions(self, action_dict: dict[str, str | None]):
         """
         action_dict: {device_id: recipe_name 或 'OFF' 或 None}, None表示这台机器维持原先的调度不作调整, 'OFF'关机
         只有当设备处于 IDLE 且 action 指定了合法配方，才切换它的 recipe 属性。
         """
+        assert action_dict is not None
         for dev_id, act in action_dict.items():
-            rt = self.dev_id_and_runtime_dict.get(dev_id)
+            rt = self.dev_id_and_dev_runtime_dict.get(dev_id)
             if (
                     rt is None
                     or act is None
@@ -94,50 +101,61 @@ class FactorySim:
 
     # ----- external helpers ------------------------------------------------ --
     def add_stock(self, material: str, qty: int):
-        self.stock[material] += qty
+        self.runtime_stock_name_and_obj_dict[material].quantity += qty
 
     def do_schedule(self, action_dict: dict | None):
         """决定本次step的所有设备的状态"""
         if self.schedule_mode == "greedy":
-            for rt in self.dev_id_and_runtime_dict.values():
-                if rt.state is DevState.IDLE and rt.can_start(self.stock):
-                    rt.start_batch(self.stock)
+            for rt in self.dev_id_and_dev_runtime_dict.values():
+                if rt.state is DevState.IDLE and rt.can_start(self.runtime_stock_name_and_obj_dict):
+                    rt.start_batch(self.runtime_stock_name_and_obj_dict)
         else:
             self.apply_actions(action_dict)
 
     # ----- main loop -------------------------------------------------------- --
-    def run_for_this_step(self):
-        # 2) tick all devices，用 dt 推进
-        for rt in self.dev_id_and_runtime_dict.values():
+    def run_one_step_after_schedule(self):
+        # tick all devices，用 dt 推进
+        for rt in self.dev_id_and_dev_runtime_dict.values():
             if rt.state is DevState.RUNNING:
                 # 本步消耗 = 功率(kW)×(dt秒 ÷ 3600秒/时)
                 self.energy_kwh_used += rt.recipe.power_kw * (self.dt / 3600)
-            rt.tick(self.stock, self.dt)
-
+            rt.tick(self.runtime_stock_name_and_obj_dict, self.dt)
         # 全局时钟也推进 dt
         self.clock += self.dt
 
+        self.record_status_for_plot()
+
+    def record_status_for_plot(self):
         # 记录工厂在该时间步的状态，用于画图
         # ----------- 记录数据 -----------
         self.hist_time.append(self.clock)
         self.hist_energy.append(self.energy_kwh_used)
-        for mat in ("IronOre", "Coal", "IronIngot",
-                    "SteelIngot", "IronBar", "Screw",
-                    "Rotor", "Motor"):
-            self.hist_stock[mat].append(self.stock[mat])  # 默认为 0
-        for dev_id, dev_runtime in self.dev_id_and_runtime_dict.items():
-            self.hist_state[dev_id].append(dev_runtime.state.name)
+        # TODO material 不能在这里写死
+        for material in self.runtime_stock_name_and_obj_dict.keys():
+            self.hist_stock[material].append(self.runtime_stock_name_and_obj_dict[material].quantity)
+        for dev_id, dev_runtime in self.dev_id_and_dev_runtime_dict.items():
+            self.hist_dev_state[dev_id].append(dev_runtime.state.name)
             # 甘特图用，如果正在跑则记 recipe 名，否则记 None
-            self.hist_recipe[dev_id].append(dev_runtime.recipe.name if dev_runtime.state is DevState.RUNNING else None)
+            self.gantt_recipe[dev_id].append(
+                dev_runtime.recipe.name
+                if dev_runtime.state is DevState.RUNNING
+                else None
+            )
 
     # ----- reporting -------------------------------------------------------- --
     def snapshot(self) -> str:
-        sums = ", ".join(f"{k}:{v}" for k, v in self.stock.items() if v)
+        sums = ", ".join(
+            f"{k}:{material_obj.quantity}"
+            for k, material_obj in self.runtime_stock_name_and_obj_dict.items()
+            if material_obj.quantity
+        )
         devs = ", ".join(
-            f"{runtime_i.device.id}:{runtime_i.state.name}" for runtime_i in self.dev_id_and_runtime_dict.values())
+            f"{runtime_i.device.id}:{runtime_i.state.name}"
+            for runtime_i in self.dev_id_and_dev_runtime_dict.values()
+        )
         return (f"[t={self.clock:4}s] stock({sums}) | devs({devs}) | "
                 f"energy={self.energy_kwh_used:,.2f} kWh")
 
     def do_schedule_and_run_for_this_step(self, action_dict: dict | None):
         self.do_schedule(action_dict=action_dict)
-        self.run_for_this_step()
+        self.run_one_step_after_schedule()

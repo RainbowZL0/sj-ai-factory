@@ -33,7 +33,7 @@ class FactoryEnv:
         # 1) 应用动作
         self.sim.apply_actions(action)
         # 2) 推进 dt 秒
-        self.sim.run_for_this_step()
+        self.sim.run_one_step_after_schedule()
         # 3) 观测、奖励、终止标志、额外信息
         obs = self._get_observation()
         reward = 0.0  # 先占位，后面再接成本／收益模型
@@ -46,7 +46,7 @@ class FactoryEnv:
             "time": self.sim.clock,
             "stock": dict(self.sim.stock),
             "device_state": {d: rt.state.name
-                             for d, rt in self.sim.dev_id_and_runtime_dict.items()},
+                             for d, rt in self.sim.dev_id_and_dev_runtime_dict.items()},
             "current_recipe": {d: rt.recipe.name
-                               for d, rt in self.sim.dev_id_and_runtime_dict.items()},
+                               for d, rt in self.sim.dev_id_and_dev_runtime_dict.items()},
         }

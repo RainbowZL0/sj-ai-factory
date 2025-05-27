@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict
 
-from pycode.data_class import Device, Recipe
+from pycode.data_class import Device, Recipe, Material
 
 
 class DevState(Enum):
@@ -18,24 +18,27 @@ class DevRuntime:
     state: DevState = DevState.IDLE
     t_left: int = 0  # seconds remaining for current batch
 
-    def can_start(self, stock: Dict[str, int]) -> bool:
+    def can_start(self, runtime_stock_name_and_obj_dict: Dict[str, Material]) -> bool:
         """Check if enough inputs exist to launch a batch."""
-        return all(stock[m] >= q for m, q in self.recipe.inputs.items())
+        for material, need_quantity in self.recipe.inputs.items():
+            if runtime_stock_name_and_obj_dict[material].quantity < need_quantity:
+                return False
+        return True
 
-    def start_batch(self, stock: Dict[str, int]):
+    def start_batch(self, runtime_stock_name_and_obj_dict: Dict[str, Material]):
         # 开始一次生产
         for m, q in self.recipe.inputs.items():
-            stock[m] -= q
+            runtime_stock_name_and_obj_dict[m].quantity -= q
         self.state = DevState.RUNNING
         self.t_left = self.recipe.cycle_time
 
-    def tick(self, stock: Dict[str, int], dt: int):
+    def tick(self, runtime_stock_name_and_obj_dict: Dict[str, Material], dt: int):
         """推进 dt 秒；若生产结束（t_left≤0），产出并切到 FINISHED。"""
         if self.state is DevState.RUNNING:
             self.t_left -= dt
             if self.t_left <= 0:
-                for m, q in self.recipe.outputs.items():
-                    stock[m] += q
+                for material, produce_quantity in self.recipe.outputs.items():
+                    runtime_stock_name_and_obj_dict[material].quantity += produce_quantity
                 self.state = DevState.FINISHED
         elif self.state is DevState.FINISHED:
             self.state = DevState.IDLE

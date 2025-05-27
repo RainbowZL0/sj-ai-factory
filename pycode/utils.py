@@ -1,7 +1,12 @@
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict
 
+from pycode.data_class import Recipe
 from pycode.dev_runtime import DevRuntime
+from ruamel.yaml import YAML
+
+yaml = YAML()
 
 
 def build_index_dict_by_id_from_list(lst, id_key_name) -> Dict:
@@ -18,24 +23,16 @@ def build_dict_of_dev_id_and_rcp_obj(
     return dic
 
 
-def build_dict_of_dev_category_and_rcp_name(recipe_spec_list):
+def build_dict_of_dev_category_and_rcp_name(
+        recipe_name_and_obj_dict: Dict
+):
     """
-    recipe_spec_list = [
-        {
-            "name": "Cast_Iron",
-            "device_category": "CASTER",
-            "cycle_time": 60,
-            "power_kw": 45.0,
-            "inputs": {"IronOre": 30},
-            "outputs": {"IronIngot": 30},
-        },
-        ...
-    ]
+    返回的字典，说明某种类型的机器能做哪些配方
     """
     rst = defaultdict(list)
-    for dic_i in recipe_spec_list:
-        device_category = dic_i["device_category"]
-        rcp_name = dic_i["name"]
+    for rcp_name, rcp_obj in recipe_name_and_obj_dict.items():
+        rcp_obj: Recipe
+        device_category = rcp_obj.device_category
         rst[device_category].append(rcp_name)
     return rst
 
@@ -52,3 +49,8 @@ def build_dict_of_dev_id_and_dev_runtime_obj(
         dev_runtime = DevRuntime(dev_obj, rcp_obj)
         rst[dev_id] = dev_runtime
     return rst
+
+
+def load_yaml(file_path: Path):
+    with file_path.open("r", encoding="utf-8") as file:
+        return yaml.load(file)

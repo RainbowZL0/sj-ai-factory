@@ -20,3 +20,14 @@ class Recipe:
     power_kw: float
     inputs: Dict[str, float]  # material → quantity / batch
     outputs: Dict[str, float]
+
+
+@dataclass
+class Material:
+    name: str
+    quantity: float
+    price_buy: float
+    price_sell: float
+    storage_cost_per_time_unit: float
+    can_buy: bool
+    can_sell: bool

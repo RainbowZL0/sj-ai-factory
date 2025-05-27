@@ -7,7 +7,7 @@ import networkx as nx
 from pycode.data_class import Device
 
 
-def plot_dashboard(sim) -> None:
+def draw_dashboard(sim) -> None:
     t = sim.hist_time
     fig, axs = plt.subplots(3, 1, figsize=(11, 9),
                             sharex=True, constrained_layout=True)
@@ -22,12 +22,12 @@ def plot_dashboard(sim) -> None:
     # ② 设备状态甘特图（简化版）
     state_code = {"IDLE": 0, "RUNNING": 1, "FINISHED": 2}
     y_offset = 0
-    for dev_id, series in sim.hist_state.items():
+    for dev_id, series in sim.hist_dev_state.items():
         y_vals = [state_code[s] + y_offset for s in series]
         axs[1].step(t, y_vals, where="post", linewidth=2)
         y_offset += 3
-    axs[1].set_yticks([1 + 3 * i for i in range(len(sim.hist_state))])
-    axs[1].set_yticklabels(sim.hist_state.keys())
+    axs[1].set_yticks([1 + 3 * i for i in range(len(sim.hist_dev_state))])
+    axs[1].set_yticklabels(sim.hist_dev_state.keys())
     axs[1].set_ylabel("Device State (idle/run/fin)")
 
     # ③ 累计耗电
@@ -41,7 +41,7 @@ def plot_dashboard(sim) -> None:
     print(f"status_dashboard image saved to {save_path}")
 
 
-def draw_topology(
+def draw_device_topology(
         devices: dict[str, Device],
 ) -> None:
     """
@@ -97,12 +97,10 @@ def draw_topology(
     print(f"Topology image saved to {save_path}")
 
 
-def plot_gantt(sim, recipe_obj_list) -> None:
+def draw_gantt(sim, recipe_obj_list) -> None:
     """Draw a coloured-bar Gantt chart: each machine-row shows when it ran which recipe."""
     # ---------- colour dictionary ----------
     recipe_set = {r.name for r in recipe_obj_list}
-    # cmap = plt.colormaps["tab20"].resampled(len(recipe_set))
-    # cmap = cm.get_cmap("tab20", len(recipe_set))
     cmap = plt.colormaps.get_cmap("tab20").resampled(len(recipe_set))
 
     color_of = {name: cmap(i) for i, name in enumerate(sorted(recipe_set))}
@@ -113,7 +111,7 @@ def plot_gantt(sim, recipe_obj_list) -> None:
 
     # ---------- 只保留真正执行过作业的机器 ----------
     active_rows = [
-        (dev_id, seq) for dev_id, seq in sim.hist_recipe.items()
+        (dev_id, seq) for dev_id, seq in sim.gantt_recipe.items()
         if any(r is not None for r in seq)
     ]
     n_rows = len(active_rows)

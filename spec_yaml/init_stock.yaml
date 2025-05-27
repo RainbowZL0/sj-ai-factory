@@ -1,71 +1,41 @@
 - name: "IronOre"
   quantity: 300
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
 
 - name: "IronIngot"
   quantity: 0
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
-
-- name: "Coal"
-  quantity: 150
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
-
-- name: "SteelIngot"
-  quantity: 0
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
 
 - name: "IronBar"
   quantity: 40
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
+
+- name: "Coal"
+  quantity: 150
+
+- name: "SteelIngot"
+  quantity: 0
 
 - name: "Screw"
   quantity: 300
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
 
 - name: "Rotor"
   quantity: 0
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
 
 - name: "Motor"
-  quantity: 0
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
+  quantity: 100
 
 - name: "CopperIngot"
   quantity: 0
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-  can_buy: false
-  can_sell: false
+
+- name: "CopperOre"
+  quantity: 0
+
+- name: "IronPlate"
+  quantity: 0
+
+- name: "SteelTube"
+  quantity: 0
+
+- name: "Wire"
+  quantity: 0
+
+- name: "Stator"
+  quantity: 0

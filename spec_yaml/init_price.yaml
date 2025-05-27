@@ -1,0 +1,79 @@
+- name: energy
+  price_buy: 100
+  price_sell:
+  storage_cost_per_time_unit:
+
+- name: rent
+  price_buy: 100
+  price_sell:
+  storage_cost_per_time_unit:
+
+- name: "IronOre"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "IronIngot"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Coal"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "SteelIngot"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "IronBar"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Screw"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Rotor"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Motor"
+  price_buy: 0
+  price_sell: 999
+  storage_cost_per_time_unit: 0
+
+- name: "CopperIngot"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "CopperOre"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "IronPlate"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "SteelTube"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Wire"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Stator"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0

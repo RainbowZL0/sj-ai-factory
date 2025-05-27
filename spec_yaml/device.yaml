@@ -2,79 +2,252 @@
 # 构造器 constructor
 # 组装器 assembler
 # 产品制造器 manufacturer
-- id: CASTER-00
-  category: caster           # 铸造器
-  in_ch: 1
-  out_ch: 1
-  upstream: [ ]
-  downstream: [ CONSTRUCTOR-01 ]
-
 - id: CASTER-01
-  category: caster
+  category: Caster           # 铸造器：铁锭
   in_ch: 1
   out_ch: 1
   upstream: [ ]
-  downstream: [ CONSTRUCTOR-02 ]
+  downstream: [ CONSTRUCTOR-01, CONSTRUCTOR-02 ]
 
 - id: CASTER-02
-  category: caster
+  category: Caster
+  in_ch: 1
+  out_ch: 1
+  upstream: [ ]
+  downstream: [ CONSTRUCTOR-03, CONSTRUCTOR-04 ]
+
+- id: CASTER-03
+  category: Caster
+  in_ch: 1
+  out_ch: 1
+  upstream: [ ]
+  downstream: [ CONSTRUCTOR-05, CONSTRUCTOR-06 ]
+
+- id: CASTER-04
+  category: Caster           # 铸造器：钢锭
+  in_ch: 1
+  out_ch: 1
+  upstream: [ ]
+  downstream: [ CONSTRUCTOR-11, CONSTRUCTOR-12 ]
+
+- id: CASTER-05
+  category: Caster           # 铸造器：铜锭
   in_ch: 2
   out_ch: 1
   upstream: [ ]
-  downstream: [ CONSTRUCTOR-03 ]
-
-- id: CASTER-03
-  category: caster
-  in_ch: 1
-  out_ch: 1
-  upstream: [ ]
-  downstream: [ CONSTRUCTOR-04 ]
+  downstream: [ CONSTRUCTOR-13, CONSTRUCTOR-14 ]
 
 - id: CONSTRUCTOR-01
-  category: constructor
+  category: Constructor        # 构造器：铁棒
   in_ch: 1
   out_ch: 1
   upstream: [ CASTER-01 ]
   downstream: [ ASSEMBLER-01 ]
 
 - id: CONSTRUCTOR-02
-  category: constructor
+  category: Constructor
   in_ch: 1
   out_ch: 1
-  upstream: [ CASTER-02 ]
-  downstream: [ ASSEMBLER-01 ]
+  upstream: [ CASTER-01 ]
+  downstream: [ ASSEMBLER-02 ]
 
 - id: CONSTRUCTOR-03
-  category: constructor
+  category: Constructor        # 构造器：铁棒（螺丝）
   in_ch: 1
   out_ch: 1
   upstream: [ CASTER-02 ]
-  downstream: [ ASSEMBLER-02 ]
+  downstream: [ CONSTRUCTOR-07 ]
 
 - id: CONSTRUCTOR-04
-  category: constructor
+  category: Constructor
   in_ch: 1
   out_ch: 1
   upstream: [ CASTER-02 ]
+  downstream: [ CONSTRUCTOR-08 ]
+
+- id: CONSTRUCTOR-05
+  category: Constructor
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CASTER-03 ]
+  downstream: [ CONSTRUCTOR-09 ]
+
+- id: CONSTRUCTOR-06
+  category: Constructor
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CASTER-03 ]
+  downstream: [ CONSTRUCTOR-10 ]
+
+- id: CONSTRUCTOR-07
+  category: Constructor        # 构造器：螺丝
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CONSTRUCTOR-03 ]
+  downstream: [ ASSEMBLER-01 ]
+
+- id: CONSTRUCTOR-08
+  category: Constructor
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CONSTRUCTOR-04 ]
+  downstream: [ ASSEMBLER-01 ]
+
+- id: CONSTRUCTOR-09
+  category: Constructor
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CONSTRUCTOR-05 ]
   downstream: [ ASSEMBLER-02 ]
 
+- id: CONSTRUCTOR-10
+  category: Constructor
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CONSTRUCTOR-06 ]
+  downstream: [ ASSEMBLER-02 ]
+
+- id: CONSTRUCTOR-11
+  category: Constructor        # 构造器：钢管
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CASTER-04 ]
+  downstream: [ ASSEMBLER-03 ]
+
+- id: CONSTRUCTOR-12
+  category: Constructor
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CASTER-04 ]
+  downstream: [ ASSEMBLER-04 ]
+
+- id: CONSTRUCTOR-13
+  category: Constructor        # 构造器：电线
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CASTER-05 ]
+  downstream: [ ASSEMBLER-03 ]
+
+- id: CONSTRUCTOR-14
+  category: Constructor
+  in_ch: 1
+  out_ch: 1
+  upstream: [ CASTER-05 ]
+  downstream: [ ASSEMBLER-04 ]
+
 - id: ASSEMBLER-01
-  category: assembler        # 组装器
+  category: Assembler        # 组装器：转子
   in_ch: 2
   out_ch: 1
-  upstream: [ CONSTRUCTOR-01, CONSTRUCTOR-02 ]
-  downstream: [ MANUFACTURER-01 ]
+  upstream: [ CONSTRUCTOR-01, CONSTRUCTOR-07, CONSTRUCTOR-08 ]
+  downstream: [ ASSEMBLER-05 ]
 
 - id: ASSEMBLER-02
-  category: assembler
+  category: Assembler
   in_ch: 2
   out_ch: 1
-  upstream: [ CONSTRUCTOR-01, CONSTRUCTOR-02 ]
-  downstream: [ MANUFACTURER-01 ]
+  upstream: [ CONSTRUCTOR-02, CONSTRUCTOR-09, CONSTRUCTOR-10 ]
+  downstream: [ ASSEMBLER-05 ]
 
-- id: MANUFACTURER-01
-  category: manufacturer     # 产品制造器
+- id: ASSEMBLER-03
+  category: Assembler        # 组装器：定子
   in_ch: 2
   out_ch: 1
-  upstream: [ ASSEMBLER-01 ]
+  upstream: [ CONSTRUCTOR-11, CONSTRUCTOR-13 ]
+  downstream: [ ASSEMBLER-05 ]
+
+- id: ASSEMBLER-04
+  category: Assembler
+  in_ch: 2
+  out_ch: 1
+  upstream: [ CONSTRUCTOR-12, CONSTRUCTOR-14 ]
+  downstream: [ ASSEMBLER-05 ]
+
+- id: ASSEMBLER-05
+  category: Assembler        # 组装器：电机
+  in_ch: 2
+  out_ch: 1
+  upstream: [ ASSEMBLER-01, ASSEMBLER-02, ASSEMBLER-03, ASSEMBLER-04 ]
   downstream: [ ]
+
+
+## 铸造器 caster
+## 构造器 constructor
+## 组装器 assembler
+## 产品制造器 manufacturer
+#- id: CASTER-00
+#  category: caster           # 铸造器
+#  in_ch: 1
+#  out_ch: 1
+#  upstream: [ ]
+#  downstream: [ CONSTRUCTOR-01 ]
+#
+#- id: CASTER-01
+#  category: caster
+#  in_ch: 1
+#  out_ch: 1
+#  upstream: [ ]
+#  downstream: [ CONSTRUCTOR-02 ]
+#
+#- id: CASTER-02
+#  category: caster
+#  in_ch: 2
+#  out_ch: 1
+#  upstream: [ ]
+#  downstream: [ CONSTRUCTOR-03 ]
+#
+#- id: CASTER-03
+#  category: caster
+#  in_ch: 1
+#  out_ch: 1
+#  upstream: [ ]
+#  downstream: [ CONSTRUCTOR-04 ]
+#
+#- id: CONSTRUCTOR-01
+#  category: constructor
+#  in_ch: 1
+#  out_ch: 1
+#  upstream: [ CASTER-01 ]
+#  downstream: [ ASSEMBLER-01 ]
+#
+#- id: CONSTRUCTOR-02
+#  category: constructor
+#  in_ch: 1
+#  out_ch: 1
+#  upstream: [ CASTER-02 ]
+#  downstream: [ ASSEMBLER-01 ]
+#
+#- id: CONSTRUCTOR-03
+#  category: constructor
+#  in_ch: 1
+#  out_ch: 1
+#  upstream: [ CASTER-02 ]
+#  downstream: [ ASSEMBLER-02 ]
+#
+#- id: CONSTRUCTOR-04
+#  category: constructor
+#  in_ch: 1
+#  out_ch: 1
+#  upstream: [ CASTER-02 ]
+#  downstream: [ ASSEMBLER-02 ]
+#
+#- id: ASSEMBLER-01
+#  category: assembler        # 组装器
+#  in_ch: 2
+#  out_ch: 1
+#  upstream: [ CONSTRUCTOR-01, CONSTRUCTOR-02 ]
+#  downstream: [ MANUFACTURER-01 ]
+#
+#- id: ASSEMBLER-02
+#  category: assembler
+#  in_ch: 2
+#  out_ch: 1
+#  upstream: [ CONSTRUCTOR-01, CONSTRUCTOR-02 ]
+#  downstream: [ MANUFACTURER-01 ]
+#
+#- id: MANUFACTURER-01
+#  category: manufacturer     # 产品制造器
+#  in_ch: 2
+#  out_ch: 1
+#  upstream: [ ASSEMBLER-01 ]
+#  downstream: [ ]

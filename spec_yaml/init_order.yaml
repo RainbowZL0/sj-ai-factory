@@ -1,0 +1,7 @@
+- name: "Motor"
+  quantity: 50
+  due_time: 200
+
+- name: "Motor"
+  quantity: 40
+  due_time: 1

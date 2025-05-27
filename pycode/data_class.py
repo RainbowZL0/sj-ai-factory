@@ -23,11 +23,34 @@ class Recipe:
 
 
 @dataclass
-class Material:
+class MaterialStock:
     name: str
     quantity: float
-    price_buy: float
-    price_sell: float
-    storage_cost_per_time_unit: float
-    can_buy: bool
-    can_sell: bool
+
+
+@dataclass
+class Price:
+    name: str
+    price_buy: float | None
+    price_sell: float | None
+    storage_cost_per_time_unit: float | None
+
+
+@dataclass
+class Order:
+    name: str
+    quantity: float | None
+    due_time: int | None
+
+    def __lt__(self, other):
+        return self.due_time < other.due_time
+
+    def __eq__(self, other):
+        return self.due_time == other.due_time
+
+    def __le__(self, other):
+        return self.due_time <= other.due_time
+
+
+if __name__ == '__main__':
+    pass

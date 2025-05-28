@@ -10,7 +10,7 @@ from pycode.dev_runtime import DevState
 from pycode.history_recorder import HistoryRecorder
 from pycode.utils import (
     build_dict_of_dev_id_and_dev_runtime_obj,
-    build_dict_of_dev_category_and_rcp_name,
+    build_dict_of_dev_category_and_rcp_name, build_dict_of_recipe_name_and_obj,
 )
 
 
@@ -46,10 +46,10 @@ class FactorySim:
             for dev_id, dev_dict in device_id_and_spec_dict.items()
         }
         # 字典，配方名 -> 配方obj
-        self.recipe_name_and_obj_dict = {
-            rcp_name: Recipe(**rcp_dict)
-            for rcp_name, rcp_dict in recipe_name_and_spec_dict.items()
-        }
+        self.recipe_name_and_obj_dict = build_dict_of_recipe_name_and_obj(
+            recipe_name_and_spec_dict=recipe_name_and_spec_dict,
+            whether_convert_to_one_second_of_cycle_time=False,
+        )
 
         # 运行时Stock管理器
         self.stock_mng = StockManagerRuntime(init_stock_name_and_spec_dict)
@@ -104,50 +104,6 @@ class FactorySim:
             dev_rt.recipe = self.recipe_name_and_obj_dict[act]
             # TODO devruntime里的配方也要改
 
-    def do_schedule(self, action_dict: dict | None):
-        """决定本次step的所有设备的状态"""
-        if self.schedule_mode == "greedy":
-            pass
-        else:
-            self.apply_actions(action_dict)
-
-    # ----- main loop -------------------------------------------------------- --
-    def run_one_step_after_schedule(self):
-        if self.clock == 59:
-            pass
-
-        # 检查能启动的生产，并启动
-        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
-            if dev_rt.can_start(self.stock_mng):
-                dev_rt.start_batch(self.stock_mng)
-
-        self.record_dev_status()
-
-        self.step_energy_kwh_used = 0.0
-        # tick all devices，用 dt 推进
-        for rt in self.dev_id_and_dev_runtime_dict.values():
-            if rt.state is DevState.RUNNING:
-                # 本步消耗 = 功率(kW)×(dt秒 ÷ 3600秒/时)
-                self.step_energy_kwh_used += rt.recipe.power_kw * (self.dt / 3600)
-            rt.tick(self.stock_mng, self.dt)
-        # 全局时钟也推进 dt
-        self.clock += self.dt
-        # 总能耗累加
-        self.total_energy_kwh_used += self.step_energy_kwh_used
-
-    def record_step_status_without_dev(self):
-        h = self.history_recorder
-        h.log_scalar("time", self.clock)
-        h.log_scalar("total_energy", self.total_energy_kwh_used)
-        h.log_scalar("total_balance", self.total_balance)
-        h.log_scalar("step_balance", self.step_balance)
-
-        # 库存向量
-        for name, stock_obj in self.stock_mng.get_items():
-            h.log_vector("stock", name, stock_obj.quantity)
-
-        h.next_step()
-
     def record_dev_status(self):
         h = self.history_recorder
         # 设备运行状态与甘特
@@ -161,8 +117,33 @@ class FactorySim:
                 else None
             )
 
-    # ----- reporting -------------------------------------------------------- --
+    # ----- main loop -------------------------------------------------------- --
+    def record_step_status_without_dev(self):
+        h = self.history_recorder
+        h.log_scalar("time", self.clock)
+        h.log_scalar("total_energy", self.total_energy_kwh_used)
+        h.log_scalar("total_balance", self.total_balance)
+        h.log_scalar("step_balance", self.step_balance)
+
+        # 库存向量
+        for name, stock_obj in self.stock_mng.get_items():
+            h.log_vector("stock", name, stock_obj.quantity)
+
+        h.next_step()
+
     def snapshot(self) -> str:
+        # TODO
+        time_log = f"Time: {self.clock}\n"
+        # dev
+        dev_log = (
+            f""
+            f""
+        )
+        # stock
+        # price
+        # order
+        # energy
+        # money
         sums = ", ".join(
             f"{k}:{material_obj.quantity}"
             for k, material_obj in self.stock_mng.get_items()
@@ -174,6 +155,40 @@ class FactorySim:
         )
         return (f"[t={self.clock:4}s] stock({sums}) | devs({devs}) | "
                 f"energy={self.total_energy_kwh_used:,.2f} kWh")
+
+    def do_schedule(self, action_dict: dict | None):
+        """决定本次step的所有设备的状态"""
+        if self.schedule_mode == "greedy":
+            pass
+        else:
+            self.apply_actions(action_dict)
+
+    # ----- reporting -------------------------------------------------------- --
+    def run_one_step_after_schedule(self):
+        if self.clock == 59:
+            pass
+
+        # 检查能启动的生产，并启动
+        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
+            if dev_rt.can_start(self.stock_mng):
+                dev_rt.start_batch(self.stock_mng)
+
+        # 记录本轮机器状态
+        self.record_dev_status()
+
+        # 计算本步耗电量
+        self.step_energy_kwh_used = 0.0
+        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
+            if dev_rt.state is DevState.RUNNING:
+                # 本步消耗 = 功率(kW)×(dt秒 ÷ 3600秒/时)
+                self.step_energy_kwh_used += dev_rt.recipe.power_kw * (self.dt / 3600)
+
+        # tick all devices，用 dt 推进
+        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
+            dev_rt.tick(self.stock_mng, self.dt)
+
+        # 总能耗累加
+        self.total_energy_kwh_used += self.step_energy_kwh_used
 
     def check_out_money(self):
         # 计算电费
@@ -205,4 +220,6 @@ class FactorySim:
         self.run_one_step_after_schedule()
         self.check_out_money()
         self.record_step_status_without_dev()
+        # 全局时钟推进
+        self.clock += self.dt
         pass

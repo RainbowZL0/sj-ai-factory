@@ -12,7 +12,7 @@ class Device:
     downstream: List[str]
 
 
-@dataclass(frozen=True)
+@dataclass
 class Recipe:
     name: str
     device_category: str  # what kind of device executes it

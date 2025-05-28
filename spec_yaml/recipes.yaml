@@ -1,6 +1,6 @@
 # ── T1：熔炼 ──
 - name: Cast_Iron
-  device_category: caster
+  device_category: Caster
   cycle_time: 60
   power_kw: 45.0
   inputs:
@@ -9,7 +9,7 @@
     IronIngot: 30
 
 - name: Cast_Steel
-  device_category: caster
+  device_category: Caster
   cycle_time: 60
   power_kw: 50.0
   inputs:
@@ -19,7 +19,7 @@
     SteelIngot: 45
 
 - name: Cast_Copper
-  device_category: caster
+  device_category: Caster
   cycle_time: 60
   power_kw: 50.0
   inputs:
@@ -29,7 +29,7 @@
 
 # ── T2：初加工 ──
 - name: Ingot_2_Bar
-  device_category: constructor
+  device_category: Constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -38,7 +38,7 @@
     IronBar: 15
 
 - name: Ingot_2_Plate
-  device_category: constructor
+  device_category: Constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -47,7 +47,7 @@
     IronPlate: 20
 
 - name: Ingot_2_Tube
-  device_category: constructor
+  device_category: Constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -56,7 +56,7 @@
     SteelTube: 20
 
 - name: Ingot_2_Wire
-  device_category: constructor
+  device_category: Constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -66,7 +66,7 @@
 
 # ── T3：再加工 ──
 - name: Bar_2_Screw
-  device_category: constructor
+  device_category: Constructor
   cycle_time: 60
   power_kw: 12.0
   inputs:
@@ -76,7 +76,7 @@
 
 # ── T4：组装 ──
 - name: RotorAssemble
-  device_category: assembler
+  device_category: Assembler
   cycle_time: 60
   power_kw: 20.0
   inputs:
@@ -86,7 +86,7 @@
     Rotor: 4
 
 - name: StatorAssemble
-  device_category: assembler
+  device_category: Assembler
   cycle_time: 60
   power_kw: 20.0
   inputs:
@@ -96,7 +96,7 @@
     Stator: 5
 
 - name: PlateAssemble
-  device_category: assembler
+  device_category: Assembler
   cycle_time: 60
   power_kw: 20.0
   inputs:
@@ -107,7 +107,7 @@
 
 # ── T5：总装 ──
 - name: MotorFinal
-  device_category: assembler
+  device_category: Assembler
   cycle_time: 60
   power_kw: 30.0
   inputs:
@@ -117,7 +117,7 @@
     Motor: 5
 
 - name: FrameFinal
-  device_category: assembler
+  device_category: Assembler
   cycle_time: 60
   power_kw: 30.0
   inputs:

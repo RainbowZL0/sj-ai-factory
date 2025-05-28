@@ -39,3 +39,9 @@
 
 - name: "Stator"
   quantity: 0
+
+- name: "ReinforcedPlate"
+  quantity: 0
+
+- name: "Frame"
+  quantity: 0

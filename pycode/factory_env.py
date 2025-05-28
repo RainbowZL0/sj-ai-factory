@@ -47,6 +47,6 @@ class FactoryEnv:
             "stock": dict(self.sim.stock),
             "device_state": {d: rt.state.name
                              for d, rt in self.sim.dev_id_and_dev_runtime_dict.items()},
-            "current_recipe": {d: rt.recipe.name
+            "current_recipe": {d: rt.bind_recipe.name
                                for d, rt in self.sim.dev_id_and_dev_runtime_dict.items()},
         }

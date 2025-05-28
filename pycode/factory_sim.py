@@ -4,6 +4,7 @@ from typing import Literal
 
 from pycode.OrderManagerRuntime import OrderManagerRuntime
 from pycode.PriceManagerRuntime import PriceManagerRuntime
+from pycode.Scheduler import Scheduler
 from pycode.StockManagerRuntime import StockManagerRuntime
 from pycode.data_class import Device, Recipe
 from pycode.dev_runtime import DevState
@@ -35,7 +36,6 @@ class FactorySim:
         :param schedule_mode: 是否以调度方式启动。无调度意味着只要原料足够就开机运转。
         """
         """复制传入参数为属性"""
-        self.runtime_bind_of_device_id_and_rcp_name_dict = init_bind_of_device_id_and_rcp_name_dict
         self.schedule_mode = schedule_mode
         self.dt = dt
 
@@ -57,6 +57,11 @@ class FactorySim:
         self.price_mng = PriceManagerRuntime(init_price_name_and_spec_dict)
         # 运行时Order管理器
         self.order_mng = OrderManagerRuntime(init_order_list)
+        # Scheduler调度器
+        self.scheduler = Scheduler(
+            schedule_mode=schedule_mode,
+            bind_of_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
+        )
 
         # 字典，设备id -> Runtime obj
         self.dev_id_and_dev_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
@@ -81,43 +86,20 @@ class FactorySim:
         """历史记录管理器"""
         self.history_recorder = HistoryRecorder()
 
-    def apply_actions(self, action_dict: dict[str, str | None]):
-        """
-        action_dict: {device_id: recipe_name 或 'OFF' 或 None}, None表示这台机器维持原先的调度不作调整, 'OFF'关机
-        只有当设备处于 IDLE 且 action 指定了合法配方，才切换它的 recipe 属性。
-        """
-        assert action_dict is not None
-        for dev_id, act in action_dict.items():
-            dev_rt = self.dev_id_and_dev_runtime_dict.get(dev_id)
-            if (
-                    dev_rt is None
-                    or act is None
-                    or act == "OFF"  # TODO 不能在关机时不能调度
-                    or dev_rt.state is not DevState.IDLE  # TODO 不能只在IDLE状态才允许调度
-            ):
-                continue
-            # 验证这台设备类别允许做该配方
-            cat = dev_rt.device.category
-            if act not in self.dev_category_and_rcp_name_dict[cat]:
-                raise ValueError(f"{dev_id}({cat}) 不支持配方 {act}")
-            # 切到新配方
-            dev_rt.recipe = self.recipe_name_and_obj_dict[act]
-            # TODO devruntime里的配方也要改
-
     def record_dev_status(self):
         h = self.history_recorder
         # 设备运行状态与甘特
-        for dev_id, rt in self.dev_id_and_dev_runtime_dict.items():
-            h.log_vector("dev_state", dev_id, rt.state.name)
+        for dev_id, dev_rt in self.dev_id_and_dev_runtime_dict.items():
+            h.log_vector("dev_state", dev_id, dev_rt.state.name)
             h.log_vector(
                 "gantt",
                 dev_id,
-                rt.recipe.name
-                if rt.state is DevState.RUNNING
+                dev_rt.bind_recipe.name
+                if dev_rt.state is DevState.RUNNING
                 else None
             )
-
     # ----- main loop -------------------------------------------------------- --
+
     def record_step_status_without_dev(self):
         h = self.history_recorder
         h.log_scalar("time", self.clock)
@@ -156,13 +138,6 @@ class FactorySim:
         return (f"[t={self.clock:4}s] stock({sums}) | devs({devs}) | "
                 f"energy={self.total_energy_kwh_used:,.2f} kWh")
 
-    def do_schedule(self, action_dict: dict | None):
-        """决定本次step的所有设备的状态"""
-        if self.schedule_mode == "greedy":
-            pass
-        else:
-            self.apply_actions(action_dict)
-
     # ----- reporting -------------------------------------------------------- --
     def run_one_step_after_schedule(self):
         if self.clock == 59:
@@ -181,7 +156,7 @@ class FactorySim:
         for dev_rt in self.dev_id_and_dev_runtime_dict.values():
             if dev_rt.state is DevState.RUNNING:
                 # 本步消耗 = 功率(kW)×(dt秒 ÷ 3600秒/时)
-                self.step_energy_kwh_used += dev_rt.recipe.power_kw * (self.dt / 3600)
+                self.step_energy_kwh_used += dev_rt.bind_recipe.power_kw * (self.dt / 3600)
 
         # tick all devices，用 dt 推进
         for dev_rt in self.dev_id_and_dev_runtime_dict.values():
@@ -215,8 +190,12 @@ class FactorySim:
         # 所有步累计余额变化
         self.total_balance += self.step_balance
 
-    def do_schedule_and_run_for_this_step(self, action_dict: dict | None):
-        self.do_schedule(action_dict=action_dict)
+    def do_schedule_and_run_for_this_step(self):
+        self.scheduler.do_schedule(
+            dev_id_and_dev_runtime_dict=self.dev_id_and_dev_runtime_dict,
+            dev_category_and_rcp_name_dict=self.dev_category_and_rcp_name_dict,
+            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
+        )
         self.run_one_step_after_schedule()
         self.check_out_money()
         self.record_step_status_without_dev()

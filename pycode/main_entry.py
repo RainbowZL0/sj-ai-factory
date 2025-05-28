@@ -26,12 +26,12 @@ def main_entry():
         init_price_name_and_spec_dict=INIT_PRICE_NAME_AND_SPEC_DICT,
         init_order_list=INIT_ORDER_LIST,
         init_money=INIT_MONEY,
-        schedule_mode="greedy",
+        schedule_mode="manual",
         dt=1,
     )
 
     for _ in range(sim_time):
-        factory_sim.do_schedule_and_run_for_this_step(action_dict=None)
+        factory_sim.do_schedule_and_run_for_this_step()
         if factory_sim.clock % print_every == 0:
             print(factory_sim.snapshot())
 

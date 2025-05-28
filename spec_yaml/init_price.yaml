@@ -77,3 +77,13 @@
   price_buy: 0
   price_sell: 0
   storage_cost_per_time_unit: 0
+
+- name: "ReinforcedPlate"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Frame"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0

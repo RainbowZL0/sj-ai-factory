@@ -1,22 +1,22 @@
 # ── T1：熔炼 ──
 - name: Cast_Iron
   device_category: Caster
-  cycle_time: 60
+  cycle_time: 2
   power_kw: 45.0
   inputs:
-    IronOre: 30
+    IronOre: 1
   outputs:
-    IronIngot: 30
+    IronIngot: 1
 
 - name: Cast_Steel
   device_category: Caster
-  cycle_time: 60
+  cycle_time: 4
   power_kw: 50.0
   inputs:
-    IronOre: 45
-    Coal: 45
+    IronOre: 3
+    Coal: 3
   outputs:
-    SteelIngot: 45
+    SteelIngot: 3
 
 - name: Cast_Copper
   device_category: Caster
@@ -30,91 +30,91 @@
 # ── T2：初加工 ──
 - name: Ingot_2_Bar
   device_category: Constructor
-  cycle_time: 60
+  cycle_time: 4
   power_kw: 15.0
   inputs:
-    IronIngot: 15
+    IronIngot: 1
   outputs:
-    IronBar: 15
+    IronBar: 1
 
 - name: Ingot_2_Plate
   device_category: Constructor
-  cycle_time: 60
+  cycle_time: 6
   power_kw: 15.0
   inputs:
-    IronIngot: 30
+    IronIngot: 3
   outputs:
-    IronPlate: 20
+    IronPlate: 2
 
 - name: Ingot_2_Tube
   device_category: Constructor
-  cycle_time: 60
+  cycle_time: 6
   power_kw: 15.0
   inputs:
-    SteelIngot: 30
+    SteelIngot: 3
   outputs:
-    SteelTube: 20
+    SteelTube: 2
 
 - name: Ingot_2_Wire
   device_category: Constructor
-  cycle_time: 60
+  cycle_time: 4
   power_kw: 15.0
   inputs:
-    CopperIngot: 15
+    CopperIngot: 1
   outputs:
-    Wire: 30
+    Wire: 2
 
 # ── T3：再加工 ──
 - name: Bar_2_Screw
   device_category: Constructor
-  cycle_time: 60
+  cycle_time: 12
   power_kw: 12.0
   inputs:
-    IronBar: 15
+    IronBar: 3
   outputs:
-    Screw: 40
+    Screw: 8
 
 # ── T4：组装 ──
 - name: RotorAssemble
   device_category: Assembler
-  cycle_time: 60
+  cycle_time: 15
   power_kw: 20.0
   inputs:
-    IronBar: 20
-    Screw: 100
+    IronBar: 5
+    Screw: 25
   outputs:
-    Rotor: 4
+    Rotor: 1
 
 - name: StatorAssemble
   device_category: Assembler
-  cycle_time: 60
+  cycle_time: 12
   power_kw: 20.0
   inputs:
-    SteelTube: 15
-    Wire: 40
+    SteelTube: 3
+    Wire: 8
   outputs:
-    Stator: 5
+    Stator: 1
 
 - name: PlateAssemble
   device_category: Assembler
-  cycle_time: 60
+  cycle_time: 12
   power_kw: 20.0
   inputs:
-    IronPlate: 30
-    Screw: 40
+    IronPlate: 6
+    Screw: 8
   outputs:
-    ReinforcedPlate: 5
+    ReinforcedPlate: 1
 
 # ── T5：总装 ──
 - name: MotorFinal
   device_category: Assembler
-  cycle_time: 60
+  cycle_time: 12
   power_kw: 30.0
   inputs:
-    Rotor: 10
-    Stator: 10
+    Rotor: 2
+    Stator: 2
   outputs:
-    Motor: 5
+    Motor: 1
 
 - name: FrameFinal
   device_category: Assembler

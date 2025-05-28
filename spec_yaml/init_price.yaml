@@ -4,7 +4,7 @@
   storage_cost_per_time_unit:
 
 - name: rent
-  price_buy: 100
+  price_buy: 10
   price_sell:
   storage_cost_per_time_unit:
 

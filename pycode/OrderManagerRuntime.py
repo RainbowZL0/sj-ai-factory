@@ -1,5 +1,8 @@
 # 轮次计时判断订单是否due了
 import bisect
+import random
+
+import numpy as np
 
 from pycode.data_class import Order
 
@@ -15,6 +18,8 @@ def get_runtime_order_obj_list(init_order_list) -> list:
 class OrderManagerRuntime:
     def __init__(self, init_order_list: list):
         self.runtime_order_obj_list = get_runtime_order_obj_list(init_order_list)
+        # TODO
+        self.tst_random_add_order(1500)
 
     def add_order_obj(self, order_obj: Order):
         bisect.insort(self.runtime_order_obj_list, order_obj)
@@ -49,3 +54,26 @@ class OrderManagerRuntime:
             else:
                 break
         return due_orders
+
+    def tst_random_add_order(self, time):
+        rng = np.random.default_rng()
+
+        quantity = rng.random(10)
+        due_time = rng.random(10)
+
+        quantity *= 10
+        quantity += 1
+        quantity = quantity.astype(int)
+
+        due_time *= time
+        due_time = due_time.astype(int)
+
+        names = ["Motor", "Frame"]
+        for q, d in zip(quantity, due_time):
+            n = random.choice(names)
+            o = Order(name=n, quantity=q, due_time=d)
+            self.add_order_obj(o)
+
+
+if __name__ == '__main__':
+    pass

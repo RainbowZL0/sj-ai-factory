@@ -8,7 +8,7 @@ from pycode.data_class import Device, Recipe
 class DevState(Enum):
     IDLE = auto()
     RUNNING = auto()
-    OFF = auto()
+    # OFF = auto()
 
 
 @dataclass

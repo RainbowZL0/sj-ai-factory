@@ -15,7 +15,7 @@ def main_entry():
     # --------------------------------------------------------------------------- #
     # 3.  Quick-and-dirty demo run                                               #
     # --------------------------------------------------------------------------- #
-    sim_time = 300  # seconds
+    sim_time = 1500  # seconds
     print_every = 1  # seconds
 
     factory_sim = FactorySim(

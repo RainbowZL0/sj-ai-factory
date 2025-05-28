@@ -113,6 +113,9 @@ class FactorySim:
 
     # ----- main loop -------------------------------------------------------- --
     def run_one_step_after_schedule(self):
+        if self.clock == 59:
+            pass
+
         # 检查能启动的生产，并启动
         for dev_rt in self.dev_id_and_dev_runtime_dict.values():
             if dev_rt.can_start(self.stock_mng):
@@ -130,8 +133,6 @@ class FactorySim:
         # 总能耗累加
         self.total_energy_kwh_used += self.step_energy_kwh_used
 
-        self.record_status()
-
     def record_status(self):
         h = self.history_recorder
         h.log_scalar("time", self.clock)
@@ -146,8 +147,13 @@ class FactorySim:
         # 设备运行状态与甘特
         for dev_id, rt in self.dev_id_and_dev_runtime_dict.items():
             h.log_vector("dev_state", dev_id, rt.state.name)
-            h.log_vector("gantt", dev_id,
-                         rt.recipe.name if rt.state is DevState.RUNNING else None)
+            h.log_vector(
+                "gantt",
+                dev_id,
+                rt.recipe.name
+                if rt.state is DevState.RUNNING
+                else None
+            )
 
         h.next_step()
 
@@ -194,4 +200,5 @@ class FactorySim:
         self.do_schedule(action_dict=action_dict)
         self.run_one_step_after_schedule()
         self.check_out_money()
+        self.record_status()
         pass

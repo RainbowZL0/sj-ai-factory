@@ -1,32 +1,32 @@
 - name: "IronOre"
-  quantity: 300
+  quantity: 3000
 
 - name: "IronIngot"
   quantity: 0
 
 - name: "IronBar"
-  quantity: 40
+  quantity: 400
 
 - name: "Coal"
-  quantity: 150
+  quantity: 1500
 
 - name: "SteelIngot"
   quantity: 0
 
 - name: "Screw"
-  quantity: 300
+  quantity: 3000
 
 - name: "Rotor"
   quantity: 0
 
 - name: "Motor"
-  quantity: 100
+  quantity: 1000
 
 - name: "CopperIngot"
   quantity: 0
 
 - name: "CopperOre"
-  quantity: 0
+  quantity: 1500
 
 - name: "IronPlate"
   quantity: 0

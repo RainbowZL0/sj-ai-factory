@@ -6,7 +6,7 @@ from pycode.data_class import Recipe
 from pycode.dev_runtime import DevRuntime
 from ruamel.yaml import YAML
 
-yaml = YAML()
+yaml = YAML(typ="safe")
 
 
 def build_index_dict_by_id_from_list(lst, id_key_name) -> Dict:
@@ -54,3 +54,24 @@ def build_dict_of_dev_id_and_dev_runtime_obj(
 def load_yaml(file_path: Path):
     with file_path.open("r", encoding="utf-8") as file:
         return yaml.load(file)
+
+
+def build_dict_of_recipe_name_and_obj(
+        recipe_name_and_spec_dict,
+        whether_convert_to_one_second_of_cycle_time: bool
+):
+    rst = {}
+    for rcp_name, rcp_dict in recipe_name_and_spec_dict.items():
+        rcp_obj = Recipe(**rcp_dict)
+        if whether_convert_to_one_second_of_cycle_time:
+            c_time = rcp_obj.cycle_time
+            divide_dict_values_by(c_time, rcp_obj.inputs)
+            divide_dict_values_by(c_time, rcp_obj.outputs)
+            rcp_obj.cycle_time = 1
+        rst[rcp_name] = rcp_obj
+    return rst
+
+
+def divide_dict_values_by(x, dic: dict):
+    for k, v in dic.items():
+        dic[k] = v / x

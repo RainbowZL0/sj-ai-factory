@@ -31,6 +31,13 @@
   downstream: [ CONSTRUCTOR-11, CONSTRUCTOR-12 ]
 
 - id: CASTER-05
+  category: Caster           # 铸造器：钢锭
+  in_ch: 1
+  out_ch: 1
+  upstream: [ ]
+  downstream: [ ]
+
+- id: CASTER-06
   category: Caster           # 铸造器：铜锭
   in_ch: 2
   out_ch: 1

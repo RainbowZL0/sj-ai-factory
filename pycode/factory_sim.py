@@ -121,6 +121,8 @@ class FactorySim:
             if dev_rt.can_start(self.stock_mng):
                 dev_rt.start_batch(self.stock_mng)
 
+        self.record_dev_status()
+
         self.step_energy_kwh_used = 0.0
         # tick all devices，用 dt 推进
         for rt in self.dev_id_and_dev_runtime_dict.values():
@@ -133,7 +135,7 @@ class FactorySim:
         # 总能耗累加
         self.total_energy_kwh_used += self.step_energy_kwh_used
 
-    def record_status(self):
+    def record_step_status_without_dev(self):
         h = self.history_recorder
         h.log_scalar("time", self.clock)
         h.log_scalar("total_energy", self.total_energy_kwh_used)
@@ -144,6 +146,10 @@ class FactorySim:
         for name, stock_obj in self.stock_mng.get_items():
             h.log_vector("stock", name, stock_obj.quantity)
 
+        h.next_step()
+
+    def record_dev_status(self):
+        h = self.history_recorder
         # 设备运行状态与甘特
         for dev_id, rt in self.dev_id_and_dev_runtime_dict.items():
             h.log_vector("dev_state", dev_id, rt.state.name)
@@ -154,8 +160,6 @@ class FactorySim:
                 if rt.state is DevState.RUNNING
                 else None
             )
-
-        h.next_step()
 
     # ----- reporting -------------------------------------------------------- --
     def snapshot(self) -> str:
@@ -200,5 +204,5 @@ class FactorySim:
         self.do_schedule(action_dict=action_dict)
         self.run_one_step_after_schedule()
         self.check_out_money()
-        self.record_status()
+        self.record_step_status_without_dev()
         pass

@@ -20,7 +20,7 @@ class FactorySim:
             device_id_and_spec_dict,
             recipe_name_and_spec_dict,
             init_stock_name_and_spec_dict,
-            init_runtime_device_id_and_rcp_name_dict,
+            init_bind_of_device_id_and_rcp_name_dict,
             init_price_name_and_spec_dict,
             init_order_list,
             init_money,
@@ -30,12 +30,12 @@ class FactorySim:
         """
         :param device_id_and_spec_dict:
         :param recipe_name_and_spec_dict:
-        :param init_runtime_device_id_and_rcp_name_dict:
+        :param init_bind_of_device_id_and_rcp_name_dict:
         :param dt: delta time
         :param schedule_mode: 是否以调度方式启动。无调度意味着只要原料足够就开机运转。
         """
         """复制传入参数为属性"""
-        self.runtime_device_id_and_rcp_name_dict = init_runtime_device_id_and_rcp_name_dict
+        self.runtime_bind_of_device_id_and_rcp_name_dict = init_bind_of_device_id_and_rcp_name_dict
         self.schedule_mode = schedule_mode
         self.dt = dt
 
@@ -62,7 +62,7 @@ class FactorySim:
         self.dev_id_and_dev_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
             device_id_and_obj_dict=self.device_id_and_obj_dict,
             recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
-            runtime_device_id_and_rcp_name_dict=init_runtime_device_id_and_rcp_name_dict,
+            runtime_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
         )
         # 字典，设备类别名 -> 能做哪些配方名的list
         self.dev_category_and_rcp_name_dict = build_dict_of_dev_category_and_rcp_name(
@@ -88,34 +88,36 @@ class FactorySim:
         """
         assert action_dict is not None
         for dev_id, act in action_dict.items():
-            rt = self.dev_id_and_dev_runtime_dict.get(dev_id)
+            dev_rt = self.dev_id_and_dev_runtime_dict.get(dev_id)
             if (
-                    rt is None
+                    dev_rt is None
                     or act is None
-                    or rt.state is not DevState.IDLE  # TODO 不能只在IDLE状态才允许调度
+                    or act == "OFF"  # TODO 不能在关机时不能调度
+                    or dev_rt.state is not DevState.IDLE  # TODO 不能只在IDLE状态才允许调度
             ):
                 continue
-            if act == "OFF":
-                # 保持空闲，不启动
-                continue
             # 验证这台设备类别允许做该配方
-            cat = rt.device.category
+            cat = dev_rt.device.category
             if act not in self.dev_category_and_rcp_name_dict[cat]:
                 raise ValueError(f"{dev_id}({cat}) 不支持配方 {act}")
             # 切到新配方
-            rt.recipe = self.recipe_name_and_obj_dict[act]
+            dev_rt.recipe = self.recipe_name_and_obj_dict[act]
+            # TODO devruntime里的配方也要改
 
     def do_schedule(self, action_dict: dict | None):
         """决定本次step的所有设备的状态"""
         if self.schedule_mode == "greedy":
-            for rt in self.dev_id_and_dev_runtime_dict.values():
-                if rt.state is DevState.IDLE and rt.can_start(self.stock_mng):
-                    rt.start_batch(self.stock_mng)
+            pass
         else:
             self.apply_actions(action_dict)
 
     # ----- main loop -------------------------------------------------------- --
     def run_one_step_after_schedule(self):
+        # 检查能启动的生产，并启动
+        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
+            if dev_rt.can_start(self.stock_mng):
+                dev_rt.start_batch(self.stock_mng)
+
         self.step_energy_kwh_used = 0.0
         # tick all devices，用 dt 推进
         for rt in self.dev_id_and_dev_runtime_dict.values():

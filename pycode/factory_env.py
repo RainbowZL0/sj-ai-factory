@@ -22,7 +22,7 @@ class FactoryEnv:
         self.sim = FactorySim(
             self.sim.device_id_and_spec_dict,
             self.sim.recipe_name_and_spec_dict,
-            self.sim.runtime_device_id_and_rcp_name_dict,
+            self.sim.runtime_bind_of_device_id_and_rcp_name_dict,
             dt=self.dt
         )
         # 可以预加载原料

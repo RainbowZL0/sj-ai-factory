@@ -133,9 +133,9 @@ def draw_gantt(hr: HistoryRecorder, recipe_obj_list) -> None:
     n_rows = len(active_rows)
 
     # ---------- 画布尺寸随行数自动放大 ----------
-    row_h = 0.8  # 单行高度（英寸）
+    row_h = 0.3  # 单行高度（英寸）
     fig_height = 2 + n_rows * row_h  # 2 in 给标题+图例
-    fig, ax = plt.subplots(figsize=(11, fig_height))
+    fig, ax = plt.subplots(figsize=(12, fig_height))
 
     # ---------- 主循环 ----------
     for y, (dev_id, rec_seq) in enumerate(active_rows):
@@ -156,7 +156,14 @@ def draw_gantt(hr: HistoryRecorder, recipe_obj_list) -> None:
                 facecolors=color_of[current],
             )
         # 行标签
-        ax.text(-2, y, dev_id, va="center", ha="right")
+        ax.text(
+            -20,
+            y,
+            dev_id,
+            va="center",
+            ha="right",
+            clip_on=False
+        )
 
     # ---------- 轴 & 图例 ----------
     ax.set_ylim(-0.5, n_rows - 0.5)
@@ -167,7 +174,7 @@ def draw_gantt(hr: HistoryRecorder, recipe_obj_list) -> None:
     handles = [mpatches.Patch(color=clr, label=name) for name, clr in color_of.items()]
     ax.legend(handles=handles, bbox_to_anchor=(1.02, 1), loc="upper left")
 
-    fig.subplots_adjust(left=0.18)  # 左边距给设备名
+    fig.subplots_adjust(left=0.3)  # 左边距给设备名
     plt.tight_layout()
     plt.show()
     save_path = "../pics/gantt.png"

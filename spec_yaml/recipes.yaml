@@ -1,6 +1,6 @@
 # ── T1：熔炼 ──
 - name: Cast_Iron
-  device_category: Caster
+  device_category: caster
   cycle_time: 60
   power_kw: 45.0
   inputs:
@@ -9,7 +9,7 @@
     IronIngot: 30
 
 - name: Cast_Steel
-  device_category: Caster
+  device_category: caster
   cycle_time: 60
   power_kw: 50.0
   inputs:
@@ -19,7 +19,7 @@
     SteelIngot: 45
 
 - name: Cast_Copper
-  device_category: Caster
+  device_category: caster
   cycle_time: 60
   power_kw: 50.0
   inputs:
@@ -29,7 +29,7 @@
 
 # ── T2：初加工 ──
 - name: Ingot_2_Bar
-  device_category: Constructor
+  device_category: constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -38,7 +38,7 @@
     IronBar: 15
 
 - name: Ingot_2_Plate
-  device_category: Constructor
+  device_category: constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -47,7 +47,7 @@
     IronPlate: 20
 
 - name: Ingot_2_Tube
-  device_category: Constructor
+  device_category: constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -56,7 +56,7 @@
     SteelTube: 20
 
 - name: Ingot_2_Wire
-  device_category: Constructor
+  device_category: constructor
   cycle_time: 60
   power_kw: 15.0
   inputs:
@@ -66,7 +66,7 @@
 
 # ── T3：再加工 ──
 - name: Ingot_2_Screw
-  device_category: Constructor
+  device_category: constructor
   cycle_time: 60
   power_kw: 12.0
   inputs:
@@ -76,7 +76,7 @@
 
 # ── T4：组装 ──
 - name: RotorAssemble
-  device_category: Assembler
+  device_category: assembler
   cycle_time: 60
   power_kw: 20.0
   inputs:
@@ -86,7 +86,7 @@
     Rotor: 4
 
 - name: StatorAssemble
-  device_category: Assembler
+  device_category: assembler
   cycle_time: 60
   power_kw: 20.0
   inputs:
@@ -95,9 +95,19 @@
   outputs:
     Stator: 5
 
+- name: PlateAssemble
+  device_category: assembler
+  cycle_time: 60
+  power_kw: 20.0
+  inputs:
+    IronPlate: 30
+    Screw: 40
+  outputs:
+    ReinforcedPlate: 5
+
 # ── T5：总装 ──
 - name: MotorFinal
-  device_category: Assembler
+  device_category: assembler
   cycle_time: 60
   power_kw: 30.0
   inputs:
@@ -106,73 +116,12 @@
   outputs:
     Motor: 5
 
-
-## ── T1：熔炼 ──
-#- name: Cast_Iron
-#  device_category: caster
-#  cycle_time: 60
-#  power_kw: 45.0
-#  inputs:
-#    IronOre: 30
-#  outputs:
-#    IronIngot: 30
-#
-#- name: Cast_Steel
-#  device_category: caster
-#  cycle_time: 60
-#  power_kw: 50.0
-#  inputs:
-#    IronOre: 45
-#    Coal: 45
-#  outputs:
-#    SteelIngot: 45
-#
-#- name: Cast_Copper
-#  device_category: caster
-#  cycle_time: 60
-#  power_kw: 50.0
-#  inputs:
-#    IronOre: 30
-#    Coal: 30
-#  outputs:
-#    CopperIngot: 30
-#
-## ── T2：加工 ──
-#- name: Ingot_2_Bar
-#  device_category: constructor
-#  cycle_time: 60
-#  power_kw: 15.0
-#  inputs:
-#    IronIngot: 15
-#  outputs:
-#    IronBar: 15
-#
-#- name: Ingot_2_Screw
-#  device_category: constructor
-#  cycle_time: 12
-#  power_kw: 12.0
-#  inputs:
-#    IronIngot: 12.5
-#  outputs:
-#    Screw: 50
-#
-## ── T3：装配 ──
-#- name: RotorAssemble
-#  device_category: assembler
-#  cycle_time: 20
-#  power_kw: 20.0
-#  inputs:
-#    IronBar: 4
-#    Screw: 100
-#  outputs:
-#    Rotor: 1
-#
-## ── T4：总装 ──
-#- name: MotorFinal
-#  device_category: manufacturer
-#  cycle_time: 25
-#  power_kw: 30.0
-#  inputs:
-#    Rotor: 2
-#  outputs:
-#    Motor: 1
+- name: FrameFinal
+  device_category: assembler
+  cycle_time: 60
+  power_kw: 30.0
+  inputs:
+    ReinforcedPlate: 3
+    IronBar: 12
+  outputs:
+    Frame: 2

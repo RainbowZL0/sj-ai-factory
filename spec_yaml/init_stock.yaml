@@ -5,7 +5,7 @@
   quantity: 0
 
 - name: "IronBar"
-  quantity: 400
+  quantity: 0
 
 - name: "Coal"
   quantity: 1500
@@ -14,7 +14,7 @@
   quantity: 0
 
 - name: "Screw"
-  quantity: 3000
+  quantity: 0
 
 - name: "Rotor"
   quantity: 0

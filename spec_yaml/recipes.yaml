@@ -65,12 +65,12 @@
     Wire: 30
 
 # ── T3：再加工 ──
-- name: Ingot_2_Screw
+- name: Bar_2_Screw
   device_category: constructor
   cycle_time: 60
   power_kw: 12.0
   inputs:
-    IronIngot: 15
+    IronBar: 15
   outputs:
     Screw: 40
 

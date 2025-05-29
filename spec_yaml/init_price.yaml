@@ -1,12 +1,12 @@
 - name: energy
-  price_buy: 100
-  price_sell:
-  storage_cost_per_time_unit:
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
 
 - name: rent
-  price_buy: 10
-  price_sell:
-  storage_cost_per_time_unit:
+  price_buy: 0.5
+  price_sell: 0
+  storage_cost_per_time_unit: 0
 
 - name: "IronOre"
   price_buy: 0
@@ -18,12 +18,17 @@
   price_sell: 0
   storage_cost_per_time_unit: 0
 
-- name: "Coal"
+- name: "SteelIngot"
   price_buy: 0
   price_sell: 0
   storage_cost_per_time_unit: 0
 
-- name: "SteelIngot"
+- name: "CopperIngot"
+  price_buy: 0
+  price_sell: 0
+  storage_cost_per_time_unit: 0
+
+- name: "Coal"
   price_buy: 0
   price_sell: 0
   storage_cost_per_time_unit: 0
@@ -39,16 +44,6 @@
   storage_cost_per_time_unit: 0
 
 - name: "Rotor"
-  price_buy: 0
-  price_sell: 0
-  storage_cost_per_time_unit: 0
-
-- name: "Motor"
-  price_buy: 0
-  price_sell: 999
-  storage_cost_per_time_unit: 0
-
-- name: "CopperIngot"
   price_buy: 0
   price_sell: 0
   storage_cost_per_time_unit: 0
@@ -83,7 +78,12 @@
   price_sell: 0
   storage_cost_per_time_unit: 0
 
+- name: "Motor"
+  price_buy: 0
+  price_sell: 800
+  storage_cost_per_time_unit: 0
+
 - name: "Frame"
   price_buy: 0
-  price_sell: 0
+  price_sell: 300
   storage_cost_per_time_unit: 0

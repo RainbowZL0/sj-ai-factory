@@ -1,16 +1,22 @@
 - name: "IronOre"
-  quantity: 3000
-
-- name: "IronIngot"
   quantity: 0
 
-- name: "IronBar"
+- name: "CopperOre"
   quantity: 0
 
 - name: "Coal"
-  quantity: 1500
+  quantity: 0
+
+- name: "IronIngot"
+  quantity: 99999
+
+- name: "CopperIngot"
+  quantity: 99999
 
 - name: "SteelIngot"
+  quantity: 99999
+
+- name: "IronBar"
   quantity: 0
 
 - name: "Screw"
@@ -18,15 +24,6 @@
 
 - name: "Rotor"
   quantity: 0
-
-- name: "Motor"
-  quantity: 1000
-
-- name: "CopperIngot"
-  quantity: 0
-
-- name: "CopperOre"
-  quantity: 1500
 
 - name: "IronPlate"
   quantity: 0
@@ -41,6 +38,9 @@
   quantity: 0
 
 - name: "ReinforcedPlate"
+  quantity: 0
+
+- name: "Motor"
   quantity: 0
 
 - name: "Frame"

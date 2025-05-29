@@ -1,54 +1,40 @@
 from __future__ import annotations
 
-from typing import Literal
+from black.trans import defaultdict
 
 from pycode.OrderManagerRuntime import OrderManagerRuntime
 from pycode.PriceManagerRuntime import PriceManagerRuntime
 from pycode.Scheduler import Scheduler
 from pycode.StockManagerRuntime import StockManagerRuntime
-from pycode.data_class import Device, Recipe
-from pycode.dev_runtime import DevState
+from pycode.dev_runtime import DevState, DevRuntime
 from pycode.history_recorder import HistoryRecorder
 from pycode.utils import (
     build_dict_of_dev_id_and_dev_runtime_obj,
-    build_dict_of_dev_category_and_rcp_name, build_dict_of_recipe_name_and_obj,
 )
 
 
 class FactorySim:
     def __init__(
             self,
-            device_id_and_spec_dict,
-            recipe_name_and_spec_dict,
+            device_id_and_obj_dict,
+            recipe_name_and_obj_dict,
             init_stock_name_and_spec_dict,
             init_bind_of_device_id_and_rcp_name_dict,
             init_price_name_and_spec_dict,
             init_order_list,
             init_money,
-            schedule_mode: Literal["greedy", "manual"],
+            manual_simulation_steps,
             dt=1,
     ):
-        """
-        :param device_id_and_spec_dict:
-        :param recipe_name_and_spec_dict:
-        :param init_bind_of_device_id_and_rcp_name_dict:
-        :param dt: delta time
-        :param schedule_mode: 是否以调度方式启动。无调度意味着只要原料足够就开机运转。
-        """
         """复制传入参数为属性"""
-        self.schedule_mode = schedule_mode
         self.dt = dt
 
         """新属性"""
-        # 字典，设备id -> 设备obj
-        self.device_id_and_obj_dict = {
-            dev_id: Device(**dev_dict)
-            for dev_id, dev_dict in device_id_and_spec_dict.items()
-        }
-        # 字典，配方名 -> 配方obj
-        self.recipe_name_and_obj_dict = build_dict_of_recipe_name_and_obj(
-            recipe_name_and_spec_dict=recipe_name_and_spec_dict,
-            whether_convert_to_one_second_of_cycle_time=False,
+        # 字典，设备id -> Runtime obj
+        self.dev_id_and_dev_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
+            device_id_and_obj_dict=device_id_and_obj_dict,
+            recipe_name_and_obj_dict=recipe_name_and_obj_dict,
+            runtime_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
         )
 
         # 运行时Stock管理器
@@ -56,23 +42,7 @@ class FactorySim:
         # 运行时Price管理器
         self.price_mng = PriceManagerRuntime(init_price_name_and_spec_dict)
         # 运行时Order管理器
-        self.order_mng = OrderManagerRuntime(init_order_list)
-        # Scheduler调度器
-        self.scheduler = Scheduler(
-            schedule_mode=schedule_mode,
-            bind_of_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
-        )
-
-        # 字典，设备id -> Runtime obj
-        self.dev_id_and_dev_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
-            device_id_and_obj_dict=self.device_id_and_obj_dict,
-            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
-            runtime_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
-        )
-        # 字典，设备类别名 -> 能做哪些配方名的list
-        self.dev_category_and_rcp_name_dict = build_dict_of_dev_category_and_rcp_name(
-            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
-        )
+        self.order_mng = OrderManagerRuntime(init_order_list, manual_simulation_steps)
 
         self.clock = 0
 
@@ -83,8 +53,29 @@ class FactorySim:
         self.total_balance = init_money
         self.step_balance = 0.0
 
+        self.step_sell_money = 0.0
+        self.step_storage_cost = 0.0
+
         """历史记录管理器"""
         self.history_recorder = HistoryRecorder()
+
+    def get_env_status(self):
+        env_without_dev = {
+            "total_energy": self.total_energy_kwh_used,
+            "step_energy": self.step_energy_kwh_used,
+            "total_balance": self.total_balance,
+            "step_balance": self.step_balance,
+            "clock": self.clock
+        }
+
+        dev_env = defaultdict(list)
+        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
+            dev_rt: DevRuntime
+            dev_env["dev_id"].append(dev_rt.device)
+            dev_env["dev_state"].append(dev_rt.state)
+            dev_env["dev_bind_recipe"].append(dev_rt.bind_recipe.name)
+
+        return {**env_without_dev, **dev_env}
 
     def record_dev_status(self):
         h = self.history_recorder
@@ -98,6 +89,7 @@ class FactorySim:
                 if dev_rt.state is DevState.RUNNING
                 else None
             )
+
     # ----- main loop -------------------------------------------------------- --
 
     def record_step_status_without_dev(self):
@@ -106,6 +98,8 @@ class FactorySim:
         h.log_scalar("total_energy", self.total_energy_kwh_used)
         h.log_scalar("total_balance", self.total_balance)
         h.log_scalar("step_balance", self.step_balance)
+        h.log_scalar("step_sell_money", self.step_sell_money)
+        h.log_scalar("step_storage_cost", self.step_storage_cost)
 
         # 库存向量
         for name, stock_obj in self.stock_mng.get_items():
@@ -139,14 +133,21 @@ class FactorySim:
                 f"energy={self.total_energy_kwh_used:,.2f} kWh")
 
     # ----- reporting -------------------------------------------------------- --
-    def run_one_step_after_schedule(self):
+    def run_one_step_after_schedule(self, scheduler: Scheduler):
         if self.clock == 59:
             pass
 
-        # 检查能启动的生产，并启动
-        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
-            if dev_rt.can_start(self.stock_mng):
-                dev_rt.start_batch(self.stock_mng)
+        for dev_id, dev_rt in self.dev_id_and_dev_runtime_dict.items():
+            # 如果调度指示是配方，不是None，且现在状态是IDLE；则检查能否启动
+            schedule_plan = scheduler.schedule_plan[dev_id]
+            if (schedule_plan is not None
+                    and dev_rt.state is DevState.IDLE):
+                if dev_rt.check_if_material_enough_to_start_bind_recipe(self.stock_mng):
+                    dev_rt.start_batch(self.stock_mng)
+
+            # TODO 为了测试，暂时注释掉这一段检查
+            # elif schedule_plan is not None and dev_rt.state is DevState.RUNNING:
+            #     raise ValueError("调度计划出错，正在运行的机器不能指定配方，只能调度None")
 
         # 记录本轮机器状态
         self.record_dev_status()
@@ -187,16 +188,17 @@ class FactorySim:
             -step_storage_cost,
             -step_rent_cost,
         ])
+        self.step_sell_money = step_sell_money
+        self.step_storage_cost = step_storage_cost
         # 所有步累计余额变化
         self.total_balance += self.step_balance
 
-    def do_schedule_and_run_for_this_step(self):
-        self.scheduler.do_schedule(
-            dev_id_and_dev_runtime_dict=self.dev_id_and_dev_runtime_dict,
-            dev_category_and_rcp_name_dict=self.dev_category_and_rcp_name_dict,
-            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
-        )
-        self.run_one_step_after_schedule()
+    def high_level_step(self, scheduler: Scheduler):
+        # self.scheduler.apply_plan_to_runtime(
+        #     dev_id_and_dev_runtime_dict=self.dev_id_and_dev_runtime_dict,
+        #     recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
+        # )
+        self.run_one_step_after_schedule(scheduler)
         self.check_out_money()
         self.record_step_status_without_dev()
         # 全局时钟推进

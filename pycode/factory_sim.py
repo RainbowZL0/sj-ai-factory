@@ -2,16 +2,18 @@ from __future__ import annotations
 
 from typing import Literal
 
+from black.trans import defaultdict
+
 from pycode.OrderManagerRuntime import OrderManagerRuntime
 from pycode.PriceManagerRuntime import PriceManagerRuntime
 from pycode.Scheduler import Scheduler
 from pycode.StockManagerRuntime import StockManagerRuntime
-from pycode.data_class import Device, Recipe
-from pycode.dev_runtime import DevState
+from pycode.data_class import Device
+from pycode.dev_runtime import DevState, DevRuntime
 from pycode.history_recorder import HistoryRecorder
 from pycode.utils import (
     build_dict_of_dev_id_and_dev_runtime_obj,
-    build_dict_of_dev_category_and_rcp_name, build_dict_of_recipe_name_and_obj,
+    build_dict_of_dev_category_and_recipe_name, build_dict_of_recipe_name_and_obj,
 )
 
 
@@ -51,6 +53,18 @@ class FactorySim:
             whether_convert_to_one_second_of_cycle_time=False,
         )
 
+        # 字典，设备id -> Runtime obj
+        self.dev_id_and_dev_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
+            device_id_and_obj_dict=self.device_id_and_obj_dict,
+            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
+            runtime_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
+        )
+
+        # 字典，设备类别名 -> 能做哪些配方名的list，每个类别机器能做的再添加一个None
+        dev_category_and_rcp_name_dict = build_dict_of_dev_category_and_recipe_name(
+            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
+        )
+
         # 运行时Stock管理器
         self.stock_mng = StockManagerRuntime(init_stock_name_and_spec_dict)
         # 运行时Price管理器
@@ -61,17 +75,7 @@ class FactorySim:
         self.scheduler = Scheduler(
             schedule_mode=schedule_mode,
             bind_of_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
-        )
-
-        # 字典，设备id -> Runtime obj
-        self.dev_id_and_dev_runtime_dict = build_dict_of_dev_id_and_dev_runtime_obj(
-            device_id_and_obj_dict=self.device_id_and_obj_dict,
-            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
-            runtime_device_id_and_rcp_name_dict=init_bind_of_device_id_and_rcp_name_dict,
-        )
-        # 字典，设备类别名 -> 能做哪些配方名的list
-        self.dev_category_and_rcp_name_dict = build_dict_of_dev_category_and_rcp_name(
-            recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
+            dev_category_and_rcp_name_dict=dev_category_and_rcp_name_dict,
         )
 
         self.clock = 0
@@ -86,6 +90,24 @@ class FactorySim:
         """历史记录管理器"""
         self.history_recorder = HistoryRecorder()
 
+    def get_env_status(self):
+        env_without_dev = {
+            "total_energy": self.total_energy_kwh_used,
+            "step_energy": self.step_energy_kwh_used,
+            "total_balance": self.total_balance,
+            "step_balance": self.step_balance,
+            "clock": self.clock
+        }
+
+        dev_env = defaultdict(list)
+        for dev_rt in self.dev_id_and_dev_runtime_dict.values():
+            dev_rt: DevRuntime
+            dev_env["dev_id"].append(dev_rt.device)
+            dev_env["dev_state"].append(dev_rt.state)
+            dev_env["dev_bind_recipe"].append(dev_rt.bind_recipe)
+
+        return {**env_without_dev, **dev_env}
+
     def record_dev_status(self):
         h = self.history_recorder
         # 设备运行状态与甘特
@@ -98,6 +120,7 @@ class FactorySim:
                 if dev_rt.state is DevState.RUNNING
                 else None
             )
+
     # ----- main loop -------------------------------------------------------- --
 
     def record_step_status_without_dev(self):
@@ -145,7 +168,7 @@ class FactorySim:
 
         # 检查能启动的生产，并启动
         for dev_rt in self.dev_id_and_dev_runtime_dict.values():
-            if dev_rt.can_start(self.stock_mng):
+            if dev_rt.check_if_material_enough_to_start_bind_recipe(self.stock_mng):
                 dev_rt.start_batch(self.stock_mng)
 
         # 记录本轮机器状态
@@ -190,10 +213,9 @@ class FactorySim:
         # 所有步累计余额变化
         self.total_balance += self.step_balance
 
-    def do_schedule_and_run_for_this_step(self):
+    def high_level_step(self):
         self.scheduler.do_schedule(
             dev_id_and_dev_runtime_dict=self.dev_id_and_dev_runtime_dict,
-            dev_category_and_rcp_name_dict=self.dev_category_and_rcp_name_dict,
             recipe_name_and_obj_dict=self.recipe_name_and_obj_dict,
         )
         self.run_one_step_after_schedule()

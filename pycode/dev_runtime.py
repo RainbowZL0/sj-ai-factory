@@ -8,7 +8,6 @@ from pycode.data_class import Device, Recipe
 class DevState(Enum):
     IDLE = auto()
     RUNNING = auto()
-    # OFF = auto()
 
 
 @dataclass
@@ -18,11 +17,14 @@ class DevRuntime:
     state: DevState = DevState.IDLE
     t_left: int = 0  # seconds remaining for current batch
 
-    def can_start(self, runtime_stock_manager: StockManagerRuntime) -> bool:
+    def check_if_material_enough_to_start_bind_recipe(
+            self,
+            runtime_stock_manager: StockManagerRuntime
+    ) -> bool:
         """Check if enough inputs exist to launch a batch."""
-        # 如果正在干活，还没结束，则不能开始下一个任务
+        # 如果正在干活，还没结束，则不能开始下一个任务，这一步必须在之前检查过。否则直接报错
         if self.state is DevState.RUNNING:
-            return False
+            raise ValueError("调度方案有误，机器不在IDLE状态却调度了一个配方。")
         # 如果所需材料库存不够，也不能开始生产
         for material, need_quantity in self.bind_recipe.inputs.items():
             if runtime_stock_manager.get_obj_by_name(material).quantity < need_quantity:
@@ -38,7 +40,7 @@ class DevRuntime:
         self.t_left = self.bind_recipe.cycle_time
 
     def tick(self, runtime_stock_manager: StockManagerRuntime, dt: int):
-        """推进 dt 秒；若生产结束（t_left≤0），产出并切到 FINISHED。"""
+        """推进 dt 秒；若生产结束（t_left≤0），产出并切到 IDLE。"""
         if self.state is DevState.RUNNING:
             self.t_left -= dt
             if self.t_left <= 0:

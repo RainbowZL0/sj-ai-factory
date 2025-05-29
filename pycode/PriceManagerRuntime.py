@@ -1,3 +1,5 @@
+from black.trans import defaultdict
+
 from pycode.OrderManagerRuntime import OrderManagerRuntime
 from pycode.StockManagerRuntime import StockManagerRuntime
 from pycode.data_class import Price, Order
@@ -53,6 +55,9 @@ class PriceManagerRuntime:
 
     def get_obj_by_name(self, name):
         return self.runtime_price_name_and_obj_dict[name]
+
+    def get_objs(self):
+        return self.runtime_price_name_and_obj_dict.values()
 
     def get_price_sell(self, name):
         return self.get_obj_by_name(name).price_sell
@@ -130,6 +135,18 @@ class PriceManagerRuntime:
         """暂时不考虑实现，材料免费"""
         # TODO
         return
+
+    def get_env_status(self):
+        rst = defaultdict(list)
+
+        for o in self.get_objs():
+            o: Price
+            rst["name"].append(o.name)
+            rst["price_buy"].append(o.price_buy)
+            rst["price_sell"].append(o.price_sell)
+            rst["storage_cost_per_time_unit"].append(o.storage_cost_per_time_unit)
+
+        return rst
 
 
 def calcu_sell_penalty_money(name, quantity_diff):

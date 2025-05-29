@@ -1,6 +1,7 @@
 # 轮次计时判断订单是否due了
 import bisect
 import random
+from collections import defaultdict
 
 import numpy as np
 
@@ -73,6 +74,15 @@ class OrderManagerRuntime:
             n = random.choice(names)
             o = Order(name=n, quantity=q, due_time=d)
             self.add_order_obj(o)
+
+    def get_env_status(self):
+        rst = defaultdict(list)
+        for o in self.get_raw_list():
+            o: Order
+            rst["name"].append(o.name)
+            rst["quantity"].append(o.quantity)
+            rst["due_time"].append(o.due_time)
+        return rst
 
 
 if __name__ == '__main__':

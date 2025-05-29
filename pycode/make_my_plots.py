@@ -20,7 +20,7 @@ def draw_dashboard(hr: HistoryRecorder):
     axs[0].legend()
 
     # ② 设备状态
-    state_code = {"IDLE": 0, "RUNNING": 1, "FINISHED": 2}
+    state_code = {"IDLE": 0, "RUNNING": 1}
     offset = 0
     for dev_id, seq in hr.vector_logs["dev_state"].items():
         axs[1].step(

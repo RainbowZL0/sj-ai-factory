@@ -31,7 +31,7 @@ def main_entry():
     )
 
     for _ in range(sim_time):
-        factory_sim.do_schedule_and_run_for_this_step()
+        factory_sim.high_level_step()
         if factory_sim.clock % print_every == 0:
             print(factory_sim.snapshot())
 

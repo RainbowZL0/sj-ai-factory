@@ -6,9 +6,10 @@ from pycode.dev_runtime import DevState
 
 class Scheduler:
     def __init__(
-            self,
-            schedule_mode,
-            bind_of_device_id_and_rcp_name_dict: dict | None,
+        self,
+        schedule_mode,
+        bind_of_device_id_and_rcp_name_dict: dict | None,
+        dev_category_and_rcp_name_dict,
     ):
         self.schedule_mode = schedule_mode
         # 以bind_of_device_id_and_rcp_name_dict，生成schedule的模板
@@ -16,13 +17,18 @@ class Scheduler:
         self.runtime_bind_of_device_id_and_rcp_name_dict = copy.copy(
             bind_of_device_id_and_rcp_name_dict
         )
+        self.dev_category_and_schedule_name_dict = get_dev_category_and_schedule_name_dict(
+            dev_category_and_rcp_name_dict=dev_category_and_rcp_name_dict
+        )
 
         self.tst_cnt = 0
+
+    def get_schedule_choice_list_by_category(self, cat):
+        return self.dev_category_and_schedule_name_dict[cat]
 
     def do_schedule(
             self,
             dev_id_and_dev_runtime_dict,
-            dev_category_and_rcp_name_dict,
             recipe_name_and_obj_dict,
     ):
         """决定本次step的所有设备的状态
@@ -36,7 +42,6 @@ class Scheduler:
 
             # TODO
             self.tst_change_schedule(
-                dev_category_and_rcp_name_dict=dev_category_and_rcp_name_dict,
                 dev_id_and_dev_runtime_dict=dev_id_and_dev_runtime_dict,
             )
 
@@ -45,14 +50,13 @@ class Scheduler:
 
                 if (
                         dev_schedule is None  # 说明不需要更改调度
-                        or dev_rt.state
-                        is not DevState.IDLE  # 如果还在生产上一个配方，则不能更改调度
+                        or dev_rt.state is not DevState.IDLE  # 如果还在生产上一个配方，则不能更改调度
                 ):
                     continue
 
-                # 验证这台设备类别允许做该配方
+                # 检查这台设备类别允许做该配方
                 dev_category = dev_rt.device.category
-                if dev_schedule not in dev_category_and_rcp_name_dict[dev_category]:
+                if dev_schedule not in self.dev_category_and_schedule_name_dict[dev_category]:
                     raise ValueError(
                         f"{dev_id}({dev_category}) 不支持配方 {dev_schedule}"
                     )
@@ -68,7 +72,6 @@ class Scheduler:
 
     def tst_change_schedule(
             self,
-            dev_category_and_rcp_name_dict,
             dev_id_and_dev_runtime_dict,
     ):
         """
@@ -80,13 +83,20 @@ class Scheduler:
         'CONSTRUCTOR-07': 'Bar_2_Screw', 'CONSTRUCTOR-08': 'Bar_2_Screw', 'CONSTRUCTOR-09': 'Bar_2_Screw',
         'CONSTRUCTOR-10': 'Bar_2_Screw', 'CONSTRUCTOR-11': 'Ingot_2_Tube', 'CONSTRUCTOR-12': 'Ingot_2_Tube',
         'CONSTRUCTOR-13': 'Ingot_2_Wire', 'CONSTRUCTOR-14': 'Ingot_2_Wire'}
-        :param dev_category_and_rcp_name_dict:
         :param dev_id_and_dev_runtime_dict:
         :return:
         """
         if self.tst_cnt % 50 == 0:
             for dev_id, dev_schedule in self.schedule.items():
                 dev_category = dev_id_and_dev_runtime_dict[dev_id].device.category
-                schedule_choices = dev_category_and_rcp_name_dict[dev_category]
+                schedule_choices = self.dev_category_and_schedule_name_dict[dev_category]
                 self.schedule[dev_id] = random.choice(schedule_choices)
         self.tst_cnt += 1
+
+
+def get_dev_category_and_schedule_name_dict(dev_category_and_rcp_name_dict):
+    rst = copy.deepcopy(dev_category_and_rcp_name_dict)
+    for dev_cat in rst:
+        l: list = rst[dev_cat]
+        l.insert(0, None)
+    return rst

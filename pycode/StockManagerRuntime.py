@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from pycode.data_class import MaterialStock
 
 
@@ -34,3 +36,11 @@ class StockManagerRuntime:
 
     def get_objs(self):
         return self.runtime_stock_name_and_obj_dict.values()
+
+    def get_env_status(self):
+        rst = defaultdict(list)
+        for obj in self.get_objs():
+            rst["name"].append(obj.name)
+            rst["quantity"].append(obj.quantity)
+
+        return rst

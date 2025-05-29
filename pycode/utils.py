@@ -23,11 +23,11 @@ def build_dict_of_dev_id_and_rcp_obj(
     return dic
 
 
-def build_dict_of_dev_category_and_rcp_name(
+def build_dict_of_dev_category_and_recipe_name(
         recipe_name_and_obj_dict: Dict
 ):
     """
-    返回的字典，说明某种类型的机器能做哪些配方
+    返回的字典，说明某种类型的机器能做哪些配方。
     """
     rst = defaultdict(list)
     for rcp_name, rcp_obj in recipe_name_and_obj_dict.items():

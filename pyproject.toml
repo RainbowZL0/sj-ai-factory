@@ -6,8 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "black>=25.1.0",
+    "gymnasium[classic-control]>=1.1.1",
     "matplotlib>=3.10.3",
     "networkx>=3.4.2",
     "pandas>=2.2.3",
     "ruamel-yaml>=0.18.10",
+    "sb3-contrib>=2.6.0",
 ]

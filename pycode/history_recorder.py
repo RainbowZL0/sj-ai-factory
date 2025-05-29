@@ -1,5 +1,13 @@
+import datetime
+import os.path
 from collections import defaultdict
+from pathlib import Path
+
 import pandas as pd
+
+from pycode.utils import now_time
+
+log_folder = "../logs"
 
 
 class HistoryRecorder:
@@ -33,6 +41,19 @@ class HistoryRecorder:
     def get_vector(self, group, key):
         return self.vector_logs[group][key]
 
-    def to_dataframe(self):
+    def scalar_to_dataframe(self):
         """把全量标量指标拼成 DataFrame，便于外部分析"""
         return pd.DataFrame(self.scalar_logs)
+
+    def vector_to_dataframe(self, vector):
+        return pd.DataFrame(self.vector_logs[vector])
+
+    def save_to_excel(self):
+        df = self.vector_to_dataframe("stock")
+        f_name = os.path.join(log_folder, f"{now_time()}-stock.xlsx")
+        df.to_excel(f_name, index=False)
+
+        df = self.scalar_to_dataframe()
+        f_name = os.path.join(log_folder, f"{now_time()}-scalar.xlsx")
+        df.to_excel(f_name, index=False)
+

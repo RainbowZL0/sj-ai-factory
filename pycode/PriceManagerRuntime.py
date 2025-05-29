@@ -1,48 +1,8 @@
 from black.trans import defaultdict
 
-from pycode.OrderManagerRuntime import OrderManagerRuntime
+from pycode.OrderManagerRuntime import OrderManagerRuntime, OrderSellResult, OrderSellResultManagerRuntime
 from pycode.StockManagerRuntime import StockManagerRuntime
 from pycode.data_class import Price, Order
-
-
-class StockSellResult:
-    def __init__(
-            self,
-            name,
-            price_sell,
-            need_to_sell_quantity,
-            sold_quantity,
-            sold_money,
-            penalty_money,
-            result_money,
-    ):
-        self.name = name
-        self.price_sell = price_sell
-        self.need_to_sell_quantity = need_to_sell_quantity
-        self.sold_quantity = sold_quantity
-        self.sold_money = sold_money
-        self.penalty_money = penalty_money
-        self.result_money = result_money
-
-
-class StockSellResultManagerRuntime:
-    def __init__(
-            self,
-            stock_sell_result_list
-    ):
-        self.stock_sell_result_list: list[StockSellResult] = stock_sell_result_list
-
-    def calcu_total_money(self):
-        rst = 0
-        for stock_sell_result in self.stock_sell_result_list:
-            rst += stock_sell_result.result_money
-        return rst
-
-    def clean(self):
-        self.stock_sell_result_list.clear()
-
-    def append(self, stock_sell_result: StockSellResult):
-        self.stock_sell_result_list.append(stock_sell_result)
 
 
 class PriceManagerRuntime:
@@ -51,7 +11,7 @@ class PriceManagerRuntime:
             name: Price(**price_dict)
             for name, price_dict in init_price_name_and_spec_dict.items()
         }
-        self.stock_sell_result_mng = StockSellResultManagerRuntime([])
+        self.order_sell_result_mng = OrderSellResultManagerRuntime()
 
     def get_obj_by_name(self, name):
         return self.runtime_price_name_and_obj_dict[name]
@@ -94,7 +54,6 @@ class PriceManagerRuntime:
             stock_mng: StockManagerRuntime,
             order_mng: OrderManagerRuntime
     ):
-        self.stock_sell_result_mng.clean()
         order_mng.tick_due_time()
         due_order_list = order_mng.pop_due_orders()
 
@@ -118,8 +77,8 @@ class PriceManagerRuntime:
                 )
             total_money = sold_money - penalty_money
 
-            self.stock_sell_result_mng.append(
-                StockSellResult(
+            self.order_sell_result_mng.append(
+                OrderSellResult(
                     name=name,
                     price_sell=sold_quantity,
                     need_to_sell_quantity=need_to_sell_quantity,
@@ -129,7 +88,9 @@ class PriceManagerRuntime:
                     result_money=total_money,
                 )
             )
-        return self.stock_sell_result_mng.calcu_total_money()
+        money = self.order_sell_result_mng.calcu_step_money()
+        self.order_sell_result_mng.finish_step()
+        return money
 
     def get_buy_material_cost(self):
         """暂时不考虑实现，材料免费"""
@@ -141,10 +102,10 @@ class PriceManagerRuntime:
 
         for o in self.get_objs():
             o: Price
-            rst["name"].append(o.name)
+            rst["price_name"].append(o.name)
             rst["price_buy"].append(o.price_buy)
             rst["price_sell"].append(o.price_sell)
-            rst["storage_cost_per_time_unit"].append(o.storage_cost_per_time_unit)
+            rst["price_storage_cost_per_time_unit"].append(o.storage_cost_per_time_unit)
 
         return rst
 

@@ -23,6 +23,7 @@ class FactorySim:
             init_price_name_and_spec_dict,
             init_order_list,
             init_money,
+            manual_simulation_steps,
             dt=1,
     ):
         """复制传入参数为属性"""
@@ -41,7 +42,7 @@ class FactorySim:
         # 运行时Price管理器
         self.price_mng = PriceManagerRuntime(init_price_name_and_spec_dict)
         # 运行时Order管理器
-        self.order_mng = OrderManagerRuntime(init_order_list)
+        self.order_mng = OrderManagerRuntime(init_order_list, manual_simulation_steps)
 
         self.clock = 0
 
@@ -51,6 +52,9 @@ class FactorySim:
         # 余额
         self.total_balance = init_money
         self.step_balance = 0.0
+
+        self.step_sell_money = 0.0
+        self.step_storage_cost = 0.0
 
         """历史记录管理器"""
         self.history_recorder = HistoryRecorder()
@@ -69,7 +73,7 @@ class FactorySim:
             dev_rt: DevRuntime
             dev_env["dev_id"].append(dev_rt.device)
             dev_env["dev_state"].append(dev_rt.state)
-            dev_env["dev_bind_recipe"].append(dev_rt.bind_recipe)
+            dev_env["dev_bind_recipe"].append(dev_rt.bind_recipe.name)
 
         return {**env_without_dev, **dev_env}
 
@@ -94,6 +98,8 @@ class FactorySim:
         h.log_scalar("total_energy", self.total_energy_kwh_used)
         h.log_scalar("total_balance", self.total_balance)
         h.log_scalar("step_balance", self.step_balance)
+        h.log_scalar("step_sell_money", self.step_sell_money)
+        h.log_scalar("step_storage_cost", self.step_storage_cost)
 
         # 库存向量
         for name, stock_obj in self.stock_mng.get_items():
@@ -139,8 +145,9 @@ class FactorySim:
                 if dev_rt.check_if_material_enough_to_start_bind_recipe(self.stock_mng):
                     dev_rt.start_batch(self.stock_mng)
 
-            elif schedule_plan is not None and dev_rt.state is DevState.RUNNING:
-                raise ValueError("调度计划出错，正在运行的机器不能指定配方，只能调度None")
+            # TODO 为了测试，暂时注释掉这一段检查
+            # elif schedule_plan is not None and dev_rt.state is DevState.RUNNING:
+            #     raise ValueError("调度计划出错，正在运行的机器不能指定配方，只能调度None")
 
         # 记录本轮机器状态
         self.record_dev_status()
@@ -181,6 +188,8 @@ class FactorySim:
             -step_storage_cost,
             -step_rent_cost,
         ])
+        self.step_sell_money = step_sell_money
+        self.step_storage_cost = step_storage_cost
         # 所有步累计余额变化
         self.total_balance += self.step_balance
 

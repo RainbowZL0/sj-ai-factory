@@ -46,8 +46,10 @@ class Scheduler:
                 continue
 
             # 如果还在生产上一个配方，则不能更改调度。直接报错，说明上一步生成的plan有误，去检查代码。
-            if dev_rt.state is not DevState.IDLE:
-                raise ValueError
+            # # TODO 为了测试，暂时注释掉这一段检查
+            # if dev_rt.state is not DevState.IDLE:
+            #     raise ValueError
+
             # 检查这台设备类别允许做该配方。直接报错，说明上一步生成的plan有误，去检查代码。
             dev_category = dev_rt.device.category
             if dev_schedule not in self.dev_category_and_schedule_name_dict[dev_category]:

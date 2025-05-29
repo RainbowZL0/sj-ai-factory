@@ -40,7 +40,7 @@ class StockManagerRuntime:
     def get_env_status(self):
         rst = defaultdict(list)
         for obj in self.get_objs():
-            rst["name"].append(obj.name)
-            rst["quantity"].append(obj.quantity)
+            rst["stock_name"].append(obj.name)
+            rst["stock_quantity"].append(obj.quantity)
 
         return rst

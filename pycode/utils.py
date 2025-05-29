@@ -1,3 +1,4 @@
+import datetime
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict
@@ -8,6 +9,10 @@ from pycode.data_class import Recipe
 from pycode.dev_runtime import DevRuntime
 
 yaml = YAML(typ="safe")
+
+
+def now_time():
+    return datetime.datetime.now().strftime("%m%d_%H%M%S")
 
 
 def build_index_dict_by_id_from_list(lst, id_key_name) -> Dict:

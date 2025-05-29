@@ -1,7 +1,5 @@
-# 轮次计时判断订单是否due了
 import bisect
 import random
-from collections import defaultdict
 
 import numpy as np
 
@@ -16,11 +14,64 @@ def get_runtime_order_obj_list(init_order_list) -> list:
     return sorted(rst)
 
 
+class OrderSellResult:
+    def __init__(
+            self,
+            name,
+            price_sell,
+            need_to_sell_quantity,
+            sold_quantity,
+            sold_money,
+            penalty_money,
+            result_money,
+    ):
+        self.name = name
+        self.price_sell = price_sell
+        self.need_to_sell_quantity = need_to_sell_quantity
+        self.sold_quantity = sold_quantity
+        self.sold_money = sold_money
+        self.penalty_money = penalty_money
+        self.result_money = result_money
+
+    def print_info(self):
+        print(
+            f"order info:\n"
+            f"name = {self.name}\n"
+            f"price_sell = {self.price_sell}\n"
+            f"need_to_sell_quantity = {self.need_to_sell_quantity}\n"
+            f"sold_quantity = {self.sold_quantity}\n"
+            f"sold_money = {self.sold_money}\n"
+            f"penalty_money = {self.penalty_money}\n"
+            f"result_money = {self.result_money}\n"
+        )
+
+
+class OrderSellResultManagerRuntime:
+    def __init__(
+            self,
+    ):
+        self.step_result = []
+        self.total_result = []
+
+    def calcu_step_money(self):
+        rst = 0
+        for stock_sell_result in self.step_result:
+            rst += stock_sell_result.result_money
+        return rst
+
+    def finish_step(self):
+        self.total_result.extend(self.step_result)
+        self.step_result.clear()
+
+    def append(self, stock_sell_result: OrderSellResult):
+        self.step_result.append(stock_sell_result)
+
+
 class OrderManagerRuntime:
-    def __init__(self, init_order_list: list):
+    def __init__(self, init_order_list: list, manual_simulation_steps):
         self.runtime_order_obj_list = get_runtime_order_obj_list(init_order_list)
         # TODO
-        self.tst_random_add_order(1500)
+        self.tst_random_add_order(manual_simulation_steps=manual_simulation_steps)
 
     def add_order_obj(self, order_obj: Order):
         bisect.insort(self.runtime_order_obj_list, order_obj)
@@ -56,17 +107,17 @@ class OrderManagerRuntime:
                 break
         return due_orders
 
-    def tst_random_add_order(self, time):
+    def tst_random_add_order(self, manual_simulation_steps):
         rng = np.random.default_rng()
 
-        quantity = rng.random(10)
-        due_time = rng.random(10)
+        quantity = rng.random(50)
+        due_time = rng.random(50)
 
         quantity *= 10
         quantity += 1
         quantity = quantity.astype(int)
 
-        due_time *= time
+        due_time *= manual_simulation_steps
         due_time = due_time.astype(int)
 
         names = ["Motor", "Frame"]
@@ -76,12 +127,17 @@ class OrderManagerRuntime:
             self.add_order_obj(o)
 
     def get_env_status(self):
-        rst = defaultdict(list)
+        rst = {
+            "order_name": [],
+            "order_quantity": [],
+            "order_due_time": [],
+        }
+
         for o in self.get_raw_list():
             o: Order
-            rst["name"].append(o.name)
-            rst["quantity"].append(o.quantity)
-            rst["due_time"].append(o.due_time)
+            rst["order_name"].append(o.name)
+            rst["order_quantity"].append(o.quantity)
+            rst["order_due_time"].append(o.due_time)
         return rst
 
 

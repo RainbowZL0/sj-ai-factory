@@ -6,6 +6,7 @@ import networkx as nx
 
 from pycode.data_class import Device
 from pycode.history_recorder import HistoryRecorder
+from pycode.utils import now_time
 
 
 def draw_dashboard(hr: HistoryRecorder):
@@ -47,9 +48,9 @@ def draw_dashboard(hr: HistoryRecorder):
     axs[4].set_xlabel("Time")
 
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
-    save_path = "../pics/status_dashboard.png"
+    save_path = f"../pics/{now_time()}-status_dashboard.png"
     fig.savefig(save_path, dpi=150)
     print(f"status_dashboard image saved to {save_path}")
 
@@ -176,7 +177,8 @@ def draw_gantt(hr: HistoryRecorder, recipe_obj_list) -> None:
 
     fig.subplots_adjust(left=0.3)  # 左边距给设备名
     plt.tight_layout()
-    plt.show()
-    save_path = "../pics/gantt.png"
+    # plt.show()
+
+    save_path = f"../pics/{now_time()}-gantt.png"
     fig.savefig(save_path, dpi=150)
     print(f"Gantt image saved to {save_path}")

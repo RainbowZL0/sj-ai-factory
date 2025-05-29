@@ -2,9 +2,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict
 
+from ruamel.yaml import YAML
+
 from pycode.data_class import Recipe
 from pycode.dev_runtime import DevRuntime
-from ruamel.yaml import YAML
 
 yaml = YAML(typ="safe")
 

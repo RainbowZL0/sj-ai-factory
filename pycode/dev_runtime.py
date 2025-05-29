@@ -18,13 +18,9 @@ class DevRuntime:
     t_left: int = 0  # seconds remaining for current batch
 
     def check_if_material_enough_to_start_bind_recipe(
-            self,
-            runtime_stock_manager: StockManagerRuntime
+        self, runtime_stock_manager: StockManagerRuntime
     ) -> bool:
         """Check if enough inputs exist to launch a batch."""
-        # 如果正在干活，还没结束，则不能开始下一个任务，这一步必须在之前检查过。否则直接报错
-        if self.state is DevState.RUNNING:
-            raise ValueError("调度方案有误，机器不在IDLE状态却调度了一个配方。")
         # 如果所需材料库存不够，也不能开始生产
         for material, need_quantity in self.bind_recipe.inputs.items():
             if runtime_stock_manager.get_obj_by_name(material).quantity < need_quantity:

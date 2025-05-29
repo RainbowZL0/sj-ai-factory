@@ -52,5 +52,5 @@ class Order:
         return self.due_time <= other.due_time
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

@@ -20,7 +20,7 @@ from pycode.Scheduler import Scheduler
 from pycode.data_class import Device
 from pycode.dev_runtime import DevState, DevRuntime
 from pycode.factory_sim import FactorySim
-from pycode.make_my_plots import draw_dashboard, draw_gantt
+from pycode.make_my_plots import draw_dashboard, draw_gantt, draw_device_topology
 from pycode.utils import (
     build_dict_of_dev_category_and_recipe_name,
     build_dict_of_recipe_name_and_obj,
@@ -433,6 +433,7 @@ class FactoryEnv(gym.Env):
 
 
 def get_fac_env():
+    """制造一个RL用的factory_env"""
     return FactoryEnv(
         device_id_and_spec_dict=DEVICE_ID_AND_SPEC_DICT,
         recipe_name_and_spec_dict=RECIPE_NAME_AND_SPEC_DICT,
@@ -448,11 +449,12 @@ def get_fac_env():
 
 
 def tst2():
+    """RL方式跑"""
     vec_env = make_vec_env(get_fac_env, n_envs=3)  # DummyVecEnv or SubprocVecEnv
     model = MaskablePPO(
         MaskableMultiInputActorCriticPolicy,
         vec_env,
-        learning_rate=3e-4,
+        learning_rate=3e-3,
         n_steps=2048,
         batch_size=256,
         gamma=0.95,
@@ -464,6 +466,33 @@ def tst2():
 # def tst3():
 #     from stable_baselines3.common.env_checker import check_env
 #     check_env(get_fac_env(), warn=True)
+
+
+def tst1():
+    """greedy方式跑"""
+    manual_simulation_steps = 5000
+    fe = FactoryEnv(
+        device_id_and_spec_dict=DEVICE_ID_AND_SPEC_DICT,
+        recipe_name_and_spec_dict=RECIPE_NAME_AND_SPEC_DICT,
+        init_stock_name_and_spec_dict=INIT_STOCK_NAME_AND_SPEC_DICT,
+        init_bind_of_device_id_and_rcp_name_dict=INIT_BIND_OF_DEVICE_ID_AND_RECIPE_NAME_DICT,
+        init_price_name_and_spec_dict=INIT_PRICE_NAME_AND_SPEC_DICT,
+        init_order_list=INIT_ORDER_LIST,
+        init_money=INIT_MONEY,
+        schedule_mode="greedy",
+        dt=1,
+        manual_simulation_steps=manual_simulation_steps,
+    )
+    for _ in range(manual_simulation_steps):
+        fe.greedy_schedule()
+        fe.sim.high_level_step(fe.scheduler)
+
+    draw_device_topology(fe.device_id_and_obj_dict)
+    draw_dashboard(fe.sim.history_recorder)
+    draw_gantt(
+        fe.sim.history_recorder,
+        recipe_obj_list=fe.recipe_name_and_obj_dict.values(),
+    )
 
 
 if __name__ == '__main__':

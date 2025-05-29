@@ -54,6 +54,8 @@ def draw_dashboard(hr: HistoryRecorder):
     fig.savefig(save_path, dpi=150)
     print(f"status_dashboard image saved to {save_path}")
 
+    plt.close(fig)
+
 
 def draw_device_topology(
         devices: dict[str, Device],
@@ -107,7 +109,7 @@ def draw_device_topology(
     plt.axis("off")
     plt.tight_layout()
     fig.show()
-    plt.close()
+    plt.close(fig)
 
     save_path = "../pics/device_topology.png"
     fig.savefig(save_path, dpi=150)
@@ -182,3 +184,5 @@ def draw_gantt(hr: HistoryRecorder, recipe_obj_list) -> None:
     save_path = f"../pics/{now_time()}-gantt.png"
     fig.savefig(save_path, dpi=150)
     print(f"Gantt image saved to {save_path}")
+
+    plt.close(fig)

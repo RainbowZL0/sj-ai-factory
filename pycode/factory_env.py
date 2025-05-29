@@ -443,12 +443,12 @@ def get_fac_env():
         init_money=INIT_MONEY,
         schedule_mode="manual",
         dt=1,
-        manual_simulation_steps=5000
+        manual_simulation_steps=500
     )
 
 
 def tst2():
-    vec_env = make_vec_env(get_fac_env, n_envs=4)  # DummyVecEnv or SubprocVecEnv
+    vec_env = make_vec_env(get_fac_env, n_envs=3)  # DummyVecEnv or SubprocVecEnv
     model = MaskablePPO(
         MaskableMultiInputActorCriticPolicy,
         vec_env,

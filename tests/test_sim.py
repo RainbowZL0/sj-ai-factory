@@ -310,3 +310,20 @@ def test_upper_bound_is_above_keep():
     b = bound(env)
     keep = run_episode(env, KeepPolicy(env.action_space), seed=2000).summary()["profit"]
     assert keep < b
+
+
+def test_downstream_priority_serves_deeper_recipes_first():
+    two = {
+        "horizon": 10,
+        "materials": {"A": {"initial_stock": 1}, "B": {"initial_stock": 1}, "C": {}},
+        "recipes": {
+            "Split": {"category": "M", "cycle_time": 2, "inputs": {"A": 1}, "outputs": {"B": 1}},
+            "Join": {"category": "M", "cycle_time": 2, "inputs": {"A": 1, "B": 1}, "outputs": {"C": 1}},
+        },
+        "machines": [{"category": "M", "recipe": "Split"}, {"category": "M", "recipe": "Join"}],
+    }
+    for priority, started in [("machine_order", [1, 0]), ("downstream", [0, 1])]:
+        sim = FactorySim(scenario_from_dict({**two, "input_priority": priority}))
+        sim.reset(seed=0)
+        sim.step()
+        assert (sim.state.remaining > 0).astype(int).tolist() == started, priority

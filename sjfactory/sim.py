@@ -75,6 +75,9 @@ class FactorySim:
         self.storage_cost = np.array([m.storage_cost for m in sc.materials], dtype=float)
         self.shortfall_penalty = np.array([m.shortfall_penalty for m in sc.materials], dtype=float)
 
+        # Sort key per recipe for handing out inputs (lower goes first); None keeps machine order
+        self.input_rank = -np.array(sc.recipe_depth) if sc.input_priority == "downstream" else None
+
         # Recipe indexes each machine can run
         self.allowed = tuple(sc.recipes_for(m.category) for m in sc.machines)
         self.n_machines = len(sc.machines)
@@ -162,8 +165,11 @@ class FactorySim:
                 s.setup[m] = sc.changeover_time
             s.recipe[m] = r
 
-        # 2. Idle machines with a recipe start if inputs are in stock. First come, first served, in machine order
+        # 2. Idle machines with a recipe start if inputs are in stock. First come, first served, in machine order,
+        #    or with input_priority "downstream" the machines furthest from the raw materials first
         waiting = np.flatnonzero(self.idle & (s.recipe != STOP))
+        if self.input_rank is not None and len(waiting) > 1:
+            waiting = waiting[np.argsort(self.input_rank[s.recipe[waiting]], kind="stable")]
         if len(waiting):
             # Machines short of inputs now stay short (starting only uses stock up), so only the rest are checked
             # one by one. Same result as checking every machine in order, much faster.

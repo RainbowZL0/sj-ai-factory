@@ -80,6 +80,9 @@ class Scenario:
     machines: tuple[Machine, ...]
     orders: tuple[Order, ...] = ()
     random_orders: RandomOrders | None = None
+    # Which waiting machines get inputs first when stock is short. "machine_order": in the order machines are
+    # listed. "downstream": machines whose recipe is further from the raw materials first, then list order.
+    input_priority: str = "machine_order"
 
     def __post_init__(self):
         self._validate()
@@ -117,6 +120,25 @@ class Scenario:
         """False if the recipe needs a material the factory can never get (ore, for example, is never bought)"""
         return set(self.recipes[recipe].inputs) <= self.obtainable
 
+    @cached_property
+    def recipe_depth(self) -> tuple[int, ...]:
+        """Per recipe: 1 if all its inputs are raw (no recipe makes them), else 1 + the deepest recipe making an input"""
+        makers: dict[str, list[int]] = {}
+        for i, r in enumerate(self.recipes):
+            for name in r.outputs:
+                makers.setdefault(name, []).append(i)
+        depth: dict[int, int] = {}
+
+        def of(i: int, seen: frozenset[int]) -> int:
+            if i not in depth:
+                if i in seen:
+                    raise ValueError(f"recipes around {self.recipes[i].name} go round in a circle")
+                below = [of(j, seen | {i}) for name in self.recipes[i].inputs for j in makers.get(name, [])]
+                depth[i] = 1 + max(below, default=0)
+            return depth[i]
+
+        return tuple(of(i, frozenset()) for i in range(len(self.recipes)))
+
     def recipes_for(self, category: str) -> tuple[int, ...]:
         """Indexes of the recipes a machine category can run"""
         return tuple(i for i, r in enumerate(self.recipes) if r.category == category)
@@ -136,6 +158,8 @@ class Scenario:
             raise ValueError("horizon must be at least 1")
         if self.changeover_time < 0:
             raise ValueError("changeover_time must not be negative")
+        if self.input_priority not in ("machine_order", "downstream"):
+            raise ValueError(f"input_priority must be machine_order or downstream, not {self.input_priority}")
 
         materials = {m.name for m in self.materials}
         recipes = {r.name: r for r in self.recipes}
@@ -221,6 +245,7 @@ def scenario_from_dict(d: dict[str, Any]) -> Scenario:
         energy_price=float(d.get("energy_price", 0.0)),
         rent_per_second=float(d.get("rent_per_second", 0.0)),
         changeover_time=int(d.get("changeover_time", 0)),
+        input_priority=d.get("input_priority", "machine_order"),
         materials=materials,
         recipes=recipes,
         machines=_expand_machines(d["machines"]),

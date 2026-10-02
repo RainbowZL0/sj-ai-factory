@@ -7,7 +7,8 @@ uv run python -m sjfactory --scenario scenarios/lab.yaml check [runs/<folder>/be
   10 s periods; each machine kind's time in a period can be split freely over its recipes; a batch's inputs are
   taken in the period it runs and its outputs count floor(cycle / 10) periods later (a real batch never finishes
   sooner); no changeovers; every order known from the start. Every real schedule fits these rules, so no policy
-  can beat it.
+  can beat it. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
+  but no longer strict.
 - Oracle (integer program): the model's own kind of decision, whole machines per recipe each minute, with a
   changeover per machine added, but knowing every order in advance. Its plan is played in the simulator.
   Not a strict bound: flow within a minute is treated as smooth, so the plan loses some profit when played.
@@ -111,11 +112,21 @@ def bound(env: FactoryEnv) -> float:
     A = sp.csr_matrix((vals, (rows, cols)), shape=(row, n))
     E = sp.csr_matrix((evals, (erows, ecols)), shape=(erow, n))
     price = np.array([sim.sell_price[m] + sim.shortfall_penalty[m] for m in o_mat])
-    c = np.concatenate([np.zeros(nx + ni), -price])
+    c = np.concatenate([_energy_cost(sim, T), _storage_cost(sim, period_len), -price])
     bounds = [(0, None)] * (nx + ni) + [(0, o.quantity) for o in orders]
     res = linprog(c, A_ub=A, b_ub=rhs, A_eq=E, b_eq=erhs, bounds=bounds, method="highs")
     assert res.status == 0, res.message
     return -res.fun - _all_penalties(env) - sc.rent_per_second * sc.horizon
+
+
+def _energy_cost(sim, T: int) -> np.ndarray:
+    """Cost per machine-second on each recipe, repeated for T periods"""
+    return np.tile(sim.power_kw / 3600 * sim.scenario.energy_price, T)
+
+
+def _storage_cost(sim, period_len: np.ndarray) -> np.ndarray:
+    """Cost of one unit of each material held at the end of each period, for the whole period"""
+    return np.outer(period_len, sim.storage_cost).ravel()
 
 
 def _all_penalties(env: FactoryEnv) -> float:
@@ -176,6 +187,8 @@ def oracle(env: FactoryEnv, time_limit=60):
             row(e, b, b)
     A = sp.csr_matrix((vals, (rows, cols)), shape=(k, nv))
     c = np.zeros(nv)
+    c[U:AD] = _energy_cost(sim, T)
+    c[I:S] = _storage_cost(sim, plen)
     for i, o in enumerate(orders):
         j = sc.material_index[o.product]
         c[S + i] = -(sim.sell_price[j] + sim.shortfall_penalty[j])

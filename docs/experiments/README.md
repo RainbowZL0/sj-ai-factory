@@ -8,6 +8,8 @@ All profits are the mean over test seeds 1000, 1001 and 1002 (the same orders ev
 
 **New default: the small lab factory** ([experiment 10](10-lab-factory.md)). It has 9 machines, round numbers and a load that can be checked by hand. A training run reaches its plateau in about 2 minutes. `python -m sjfactory check` shows keep, the oracle and the upper bound in under a minute. On new seeds the model reaches 96% of the upper bound (oracle 97%, keep 32%). Test ideas for the factory here first, as variant files (`base: lab.yaml`).
 
+First ideas tried ([experiment 11](11-lab-variants.md)): serving machines further down the line first changes nothing; spare time before the bottleneck lifts the oracle to 100% of the bound; storage costs hurt keep but not a model. The model trained on more orders than capacity (`lab-busy.yaml`) is the best on every lab scenario.
+
 The rest of this section is about the larger factory of experiments 1 to 9 (`casters.yaml`, `varied.yaml`).
 
 
@@ -29,11 +31,12 @@ The model is no longer the main limit: on every order type it matches or beats a
 
 ## Next steps
 
-1. Try factory ideas on the lab factory as variant files, comparing the share of the upper bound before and after with `check`: input priority for machines further down the line, storage costs, a slower or extra machine kind (a real bottleneck), more product types.
-2. Train on `lab-busy.yaml` or a mix of demand levels: the model leaves 4 points to the oracle when there are more orders than capacity.
-3. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
-4. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
-5. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
+1. Train on a mix of demand levels (order count drawn from a wider range, for example 15 to 50), so one model covers both normal and busy days.
+2. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).
+3. Make the lab harder in ways that need planning: a third product, a material shared between recipes at different depths, or a machine kind that can only run some recipes.
+4. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
+5. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
+6. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
 
 ## Experiments
 
@@ -49,6 +52,7 @@ The model is no longer the main limit: on every order type it matches or beats a
 | 8 | [08-varied-orders.md](08-varied-orders.md) | Notice times, varied orders per episode, move cost | Beats keep on every order shape; 10k less on the usual one; move cost cuts switches 4 times |
 | 9 | [09-bottleneck-analysis.md](09-bottleneck-analysis.md) | Analysis: upper bound and oracle planner | Models match the oracle; limits are demand, then constructor time and batch flow |
 | 10 | [10-lab-factory.md](10-lab-factory.md) | Small balanced lab factory, variant files, `check` command | 4-minute training reaches 96% of the upper bound, level with the oracle |
+| 11 | [11-lab-variants.md](11-lab-variants.md) | Input priority, storage costs, one tight kind, more orders than capacity | Priority changes nothing; spare time upstream helps; training on busy orders gives the best model |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

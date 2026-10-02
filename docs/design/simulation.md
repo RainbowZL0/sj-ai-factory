@@ -5,7 +5,7 @@
 `FactorySim.step(changes)` does these steps in this order:
 
 1. **Switch recipes.** Only idle machines (no batch running, no changeover going on) can switch. Asking a busy machine to switch is an error, because it would mean the caller has a bug. Switching to a different recipe starts a changeover of `changeover_time` seconds, during which the machine makes nothing and uses no power. Stopping needs no changeover; starting again after a stop does.
-2. **Start batches.** Every idle machine that has a recipe starts if the stock covers the inputs. Inputs are taken now. Machines are served in list order.
+2. **Start batches.** Every idle machine that has a recipe starts if the stock covers the inputs. Inputs are taken now. Machines are served in list order, or with `input_priority: downstream` the machines whose recipe is furthest from the raw materials first (`Scenario.recipe_depth`), then in list order.
 3. **Use power.** Running machines use `power_kw × 1 s` of energy.
 4. **Advance one second.** Changeovers count down. Batches that reach zero put their outputs into stock.
 5. **Settle due orders.** Orders whose due time has arrived ship whatever stock exists. Missing units cost `shortfall_penalty` each.
@@ -36,14 +36,19 @@ A small factory built for quick experiments: round numbers, every load easy to c
 
 On seeds 2000 to 2009, keep makes 41k (32% of the upper bound) and the oracle 126k (97%).
 
-`scenarios/lab-busy.yaml` is a variant with 30 to 50 orders, about 410 units against a capacity of 360, so the plan also has to choose which orders to leave short.
+Variants (each a few lines on top of `lab.yaml`):
+- `lab-busy.yaml`: 30 to 50 orders, about 410 units against a capacity of 360, so the plan also has to choose which orders to leave short.
+- `lab-storage.yaml`: storage costs on every part and product (0.01 to 0.05 per unit per second), so parts made too early cost profit.
+- `lab-bottleneck.yaml`: 4 smelters and 4 constructors, so only the assemblers are tight.
+
+`casters-downstream.yaml` is the larger casters factory with `input_priority: downstream`.
 
 ## Checking a scenario without training
 
 `uv run python -m sjfactory --scenario <file> check [models ...]` prints, in under a minute:
 - the machine seconds each product needs from each kind, and the most of each product per episode;
 - the orders, and the share of each kind's time they need;
-- the profit of keep, any models given, the oracle and the upper bound (see [experiment 9](../experiments/09-bottleneck-analysis.md)), on seeds 2000 to 2009, each as a share of the upper bound.
+- the profit of keep, any models given, the oracle and the upper bound (see [experiment 9](../experiments/09-bottleneck-analysis.md)), on seeds 2000 to 2009, each as a share of the upper bound. The bound and the oracle count energy and storage costs; storage is charged on the stock at the end of each period, so with storage costs the bound is close but not strict.
 
 Use it to see whether a change to the factory changes anything before spending a training run on it.
 

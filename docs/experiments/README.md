@@ -44,7 +44,7 @@ The files are now in `scenarios/large/`. Two trained models, both with the move 
 
 ## Next steps
 
-See the [roadmap](../roadmap.md). Milestone 5 is done and one model now covers every two-product kind of day (milestone 6, step 1). Next: train the mix longer to close the last 1 to 2 points, then show the model how much of the day's usual demand is still to come.
+See the [roadmap](../roadmap.md). Milestone 5 is done and one model now covers every two-product kind of day (milestone 6, step 1). Training the mix twice as long didn't help. Next: show the model how much of the day's usual demand is still to come (milestone 6, step 2).
 ## Experiments
 
 | # | Page | Change | Result |
@@ -67,7 +67,7 @@ See the [roadmap](../roadmap.md). Milestone 5 is done and one model now covers e
 | 16 | [16-busy-days-longer-training.md](16-busy-days-longer-training.md) | 2M steps on busy days; order slack; 30 test days | Longer training closes the gap (87% against the oracle's 85% on 30 days); 10 days are too few; order slack adds nothing |
 | 17 | [17-replanning-yardsticks.md](17-replanning-yardsticks.md) | Oracle re-planned every 5 minutes, with all orders or only announced ones | Model beats the fair planner by 2-5 points and is 3 below the one that sees the future; knowing orders ahead is worth 5-8 points |
 | 18 | [18-short-notice-and-breakdowns.md](18-short-notice-and-breakdowns.md) | Short notice (`lab-short`); machine breakdowns as a setting (`lab-breakdowns`); bound counts breakdowns | Short notice: model 83%, fair planner 61%. Breakdowns: model 74%, every planner 70-71% |
-| 19 | [19-one-model-for-all-days.md](19-one-model-for-all-days.md) | One model trained on a mix of light-to-busy, busy, short-notice and breakdown days (`train --mix`) | Within 1-2 points of the specialists, 2 ahead on breakdowns (76%); matches or beats the fair planner everywhere |
+| 19 | [19-one-model-for-all-days.md](19-one-model-for-all-days.md) | One model trained on a mix of light-to-busy, busy, short-notice and breakdown days (`train --mix`) | Within 1-2 points of the specialists, 2 ahead on breakdowns (76%); matches or beats the fair planner everywhere; 8M steps no better |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

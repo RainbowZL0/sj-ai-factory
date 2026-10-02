@@ -103,7 +103,7 @@ predicting orders not yet announced. And today each kind of day has its own best
 1. One model for all two-product days (done, [experiment 19](experiments/19-one-model-for-all-days.md)):
    `train --mix` over light-to-busy, busy, short-notice and breakdown days, 4M steps. It is 1 to 2 points
    behind the models trained on one kind of day, 2 ahead on breakdown days, and matches or beats the fair
-   planner everywhere. Next try: train the mix longer (each kind got 1M steps, the specialists 2M).
+   planner everywhere. Training it twice as long (8M steps) gave the same scores.
 2. Show the model how much of the day's usual demand is still to come.
 
 ## Parked

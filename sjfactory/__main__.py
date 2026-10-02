@@ -62,6 +62,7 @@ def make_env(args, scenario=None) -> FactoryEnv:
         scenario or args.scenario, horizon=args.horizon, ticks_per_action=args.ticks,
         move_cost=getattr(args, "move_cost", 0.0), order_slack=getattr(args, "order_slack", False),
         show_breakdowns=getattr(args, "show_breakdowns", False),
+        demand_outlook=getattr(args, "demand_outlook", False),
     )
 
 
@@ -126,6 +127,7 @@ def cmd_train(args):
         move_cost=args.move_cost,
         order_slack=args.order_slack,
         show_breakdowns=args.show_breakdowns,
+        demand_outlook=args.demand_outlook,
         mix=mix if len(mix) > 1 else None,
         test_seeds=seeds,
     )
@@ -203,6 +205,7 @@ def cmd_eval(args):
     options = model_env_options(args.model)
     args.order_slack = options.get("order_slack", False)
     args.show_breakdowns = options.get("show_breakdowns", False)
+    args.demand_outlook = options.get("demand_outlook", False)
     env = make_env(args)
     out = new_run_dir("eval")
     web.write_config(out, **base_config(args, "eval", env), model=str(args.model), mode=args.mode)
@@ -268,6 +271,10 @@ def main():
     t.add_argument(
         "--order-slack", action="store_true",
         help="also show the model, per order, the time to spare once it and the earlier orders that fit are made",
+    )
+    t.add_argument(
+        "--demand-outlook", action="store_true",
+        help="also show the model how many units a usual day still has to announce, from the scenario's order settings",
     )
     t.add_argument(
         "--mix", nargs="+", default=[], metavar="SCENARIO",

@@ -104,7 +104,11 @@ predicting orders not yet announced. And today each kind of day has its own best
    `train --mix` over light-to-busy, busy, short-notice and breakdown days, 4M steps. It is 1 to 2 points
    behind the models trained on one kind of day, 2 ahead on breakdown days, and matches or beats the fair
    planner everywhere. Training it twice as long (8M steps) gave the same scores.
-2. Show the model how much of the day's usual demand is still to come.
+2. Show the model how much of the day's usual demand is still to come (done, [experiment 20](experiments/20-demand-outlook.md)):
+   `train --demand-outlook`. The final model gains 1 to 4 points and is level with the specialists, but the
+   "best" versions barely move, so it may be noise.
+3. Next ideas: repeat the comparisons with a second training seed to tell real gains from noise; look at the
+   days where the planner that knows every order beats the model most, to see what the model failed to guess.
 
 ## Parked
 

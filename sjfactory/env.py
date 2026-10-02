@@ -51,6 +51,24 @@ class Kind:
         return tuple((a, b) for a in range(n) for b in range(n) if a != b)
 
 
+def expected_unannounced(sc: Scenario) -> np.ndarray:
+    """[second]: units of random orders a usual day has not announced yet at that second, on average over days.
+    Uses only the scenario's order settings (how many orders, how large, how much notice, when they fall due),
+    which a factory would know from experience; never the orders of the day being played."""
+    out = np.zeros(sc.horizon + 1)
+    spec = sc.random_orders
+    if spec is None:
+        return out
+    units = (spec.count_range[0] + spec.count_range[1]) / 2 * (spec.quantity_range[0] + spec.quantity_range[1]) / 2
+    first_due = spec.notice_range[0] if spec.notice_range else 0
+    due = np.arange(first_due, sc.horizon)  # due times are drawn evenly from these
+    notices = np.arange(spec.notice_range[0], spec.notice_range[1] + 1) if spec.notice_range else np.array([0])
+    known = np.maximum(0, due[:, None] - notices[None, :]).ravel()  # every (due, notice) pair is equally likely
+    # An order is unannounced at second t while its known time is later than t
+    later = len(known) - np.searchsorted(np.sort(known), np.arange(sc.horizon + 1), side="right")
+    return units * later / len(known)
+
+
 class FactoryEnv(gym.Env):
     metadata = {"render_modes": []}
 
@@ -65,6 +83,7 @@ class FactoryEnv(gym.Env):
         move_cost: float = 0.0,
         order_slack: bool = False,
         show_breakdowns: bool = False,
+        demand_outlook: bool = False,
     ):
         """
         :param horizon: overrides the scenario's seconds per episode
@@ -77,6 +96,8 @@ class FactoryEnv(gym.Env):
             without it can't be swapped.
         :param show_breakdowns: show each machine's repair time left even if the scenario has no breakdowns
             (always 0 then), so one model can play days with and without them
+        :param demand_outlook: also show how many units a usual day still has to announce (see
+            expected_unannounced()), worked out from the scenario's order settings only, never from today's orders
         """
         if not isinstance(scenario, Scenario):
             scenario = load_scenario(scenario)
@@ -90,6 +111,8 @@ class FactoryEnv(gym.Env):
         self.move_cost = move_cost
         self.order_slack = order_slack
         self.show_breakdowns = show_breakdowns or scenario.breakdowns is not None
+        self.demand_outlook = demand_outlook
+        self._outlook = expected_unannounced(scenario) if demand_outlook else None
 
         sc = scenario
         kinds, start = [], 0
@@ -124,6 +147,7 @@ class FactoryEnv(gym.Env):
             + self.sim.n_machines * (n_rcp + 4)  # recipe (including stop), batch left, changeover left, waiting for inputs
             + self.sim.n_machines * self.show_breakdowns  # repair time left, only if machines can break down
             + len(sc.products)  # units still ordered per product, over all known orders
+            + demand_outlook  # units a usual day still has to announce
             + visible_orders * (len(sc.products) + 2 + order_slack)  # product, quantity, time until due, [slack]
         )
         # Every value is already squashed close to 0; even _squash(1e40) is only about 9
@@ -241,6 +265,7 @@ class FactoryEnv(gym.Env):
                 np.column_stack([recipe_onehot, progress, setup, waiting]).ravel(),
                 s.down / (sc.breakdowns.duration_range[1] if sc.breakdowns else 1) if self.show_breakdowns else np.zeros(0),
                 _squash(demand),
+                [_squash(self._outlook[min(s.clock, sc.horizon)])] if self.demand_outlook else np.zeros(0),
                 orders.ravel(),
             ]
         ).clip(-10, 10).astype(np.float32)

@@ -469,6 +469,23 @@ def test_show_breakdowns_lets_one_model_play_days_with_and_without_them():
     assert obs.shape == lab.observation_space.shape
 
 
+def test_demand_outlook_matches_the_average_day():
+    from sjfactory.env import expected_unannounced
+
+    sc = load_scenario(PROJECT_ROOT / "scenarios" / "lab-short.yaml")
+    outlook = expected_unannounced(sc)
+    sim = FactorySim(sc)
+    at = [0, 900, 1800, 2700]
+    seen = np.zeros(len(at))
+    for seed in range(300):
+        sim.reset(seed=seed)
+        seen += [sum(o.quantity for o in sim.state.orders if o.known_time > t) for t in at]
+    assert outlook[-1] == 0 and (np.diff(outlook) <= 0).all()
+    assert seen / 300 == pytest.approx(outlook[at], rel=0.05)
+    env = FactoryEnv(sc, ticks_per_action=60, demand_outlook=True)
+    assert env.reset(seed=0)[0].shape == env.observation_space.shape
+
+
 def test_machine_time_split_adds_up():
     from sjfactory.check import time_split
     from sjfactory.evaluate import run_episode

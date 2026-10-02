@@ -22,7 +22,8 @@ class State:
     cash: float
     stock: np.ndarray  # [material], amount in stock
     recipe: np.ndarray  # [machine], index of the assigned recipe, STOP if stopped
-    remaining: np.ndarray  # [machine], seconds left in the current batch, 0 means idle
+    remaining: np.ndarray  # [machine], seconds left in the current batch, 0 means no batch
+    setup: np.ndarray  # [machine], seconds left in a recipe changeover; a machine in changeover makes nothing
     orders: list[Order]  # orders not yet delivered, sorted by due time
 
 
@@ -100,6 +101,7 @@ class FactorySim:
                 dtype=int,
             ),
             remaining=np.zeros(self.n_machines, dtype=int),
+            setup=np.zeros(self.n_machines, dtype=int),
             orders=orders,
         )
         return self.state
@@ -119,6 +121,11 @@ class FactorySim:
         ]
 
     @property
+    def idle(self) -> np.ndarray:
+        """[machine] True if the machine is neither running a batch nor in a changeover, so it may switch recipe"""
+        return (self.state.remaining == 0) & (self.state.setup == 0)
+
+    @property
     def done(self) -> bool:
         return self.state.clock >= self.scenario.horizon
 
@@ -130,26 +137,34 @@ class FactorySim:
         """
         s, sc = self.state, self.scenario
 
-        # 1. Switch recipes: only idle machines can switch
+        # 1. Switch recipes: only idle machines can switch. A different recipe needs a changeover first
+        idle = self.idle
         for m, r in (changes or {}).items():
-            if s.remaining[m] > 0:
+            if not idle[m]:
                 raise ValueError(f"{sc.machines[m].id} is busy and cannot switch recipe")
             if r != STOP and r not in self.allowed[m]:
                 raise ValueError(f"{sc.machines[m].id} cannot run recipe {sc.recipes[r].name}")
+            if r != STOP and r != s.recipe[m]:
+                s.setup[m] = sc.changeover_time
             s.recipe[m] = r
 
         # 2. Idle machines with a recipe start if inputs are in stock. First come, first served, in machine order
-        for m in np.flatnonzero((s.remaining == 0) & (s.recipe != STOP)):
-            need = self.recipe_in[s.recipe[m]]
-            if np.all(s.stock >= need):
-                s.stock -= need
-                s.remaining[m] = self.cycle_time[s.recipe[m]]
+        waiting = np.flatnonzero(self.idle & (s.recipe != STOP))
+        if len(waiting):
+            # Machines short of inputs now stay short (starting only uses stock up), so only the rest are checked
+            # one by one. Same result as checking every machine in order, much faster.
+            need = self.recipe_in[s.recipe[waiting]]
+            for m, n in zip(waiting[(s.stock >= need).all(axis=1)], need[(s.stock >= need).all(axis=1)]):
+                if (s.stock >= n).all():
+                    s.stock -= n
+                    s.remaining[m] = self.cycle_time[s.recipe[m]]
 
         running = s.remaining > 0
         running_recipe = np.where(running, s.recipe, STOP)
         energy_kwh = float(self.power_kw[s.recipe[running]].sum()) / 3600
 
-        # 3. Advance 1 second; finished batches go into stock
+        # 3. Advance 1 second; changeovers count down; finished batches go into stock
+        s.setup[s.setup > 0] -= 1
         s.remaining[running] -= 1
         for m in np.flatnonzero(running & (s.remaining == 0)):
             s.stock += self.recipe_out[s.recipe[m]]

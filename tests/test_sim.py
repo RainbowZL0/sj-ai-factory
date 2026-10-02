@@ -1,9 +1,11 @@
+import json
+
 import numpy as np
 import pytest
 from gymnasium.utils.env_checker import check_env
 
 from sjfactory import STOP, FactoryEnv, FactorySim, load_scenario
-from sjfactory.env import FIRST_RECIPE_CHOICE, KEEP, STOP_CHOICE
+from sjfactory.env import NO_CHANGE, allocate
 from sjfactory.policies import KeepPolicy, RandomPolicy
 from sjfactory.recorder import Recorder
 from sjfactory.spec import scenario_from_dict
@@ -101,33 +103,66 @@ def test_env_passes_gymnasium_checks():
     check_env(FactoryEnv(horizon=50), skip_render_check=True)
 
 
-def test_action_mask_only_lets_idle_machines_change():
-    env = FactoryEnv(horizon=50)
-    env.reset(seed=0)
-    env.step(np.zeros(env.action_space.shape, dtype=int))
-    mask = env.action_masks().reshape(env.sim.n_machines, env.n_choices)
-    running = env.sim.state.remaining > 0
-    assert running.any()
-    assert mask[:, KEEP].all()
-    assert not mask[running, STOP_CHOICE:].any()
-    idle = np.flatnonzero(~running)[0]
-    n = len(env.sim.allowed[idle])
-    assert mask[idle, STOP_CHOICE : FIRST_RECIPE_CHOICE + n].all()
-    assert not mask[idle, FIRST_RECIPE_CHOICE + n :].any()
+def test_allocate_splits_machines_in_proportion():
+    assert allocate(np.array([1, 1, 0]), 5).tolist() == [3, 2, 0]
+    assert allocate(np.array([6, 4, 2, 2, 0]), 14).tolist() == [6, 4, 2, 2, 0]
+    assert allocate(np.array([0, 0, 7]), 3).tolist() == [0, 0, 3]
 
 
-def test_masked_choices_become_keep():
+def test_recipes_that_can_never_run_get_no_slot():
     env = FactoryEnv(horizon=50)
+    sc = env.sim.scenario
+    assert "IronOre" not in sc.obtainable and "Motor" in sc.obtainable
+    assert [k.category for k in env.kinds] == ["Constructor", "Assembler"]  # every caster recipe needs ore
+    assert env.action_space.nvec.tolist() == [15] * 5 + [6] * 5
+
+
+def test_plan_switches_idle_machines_only_and_keeps_the_rest():
+    env = FactoryEnv(horizon=400, ticks_per_action=1)
     env.reset(seed=0)
-    env.step(np.zeros(env.action_space.shape, dtype=int))
-    busy = int(np.flatnonzero(env.sim.state.remaining > 0)[0])
-    action = np.zeros(env.action_space.shape, dtype=int)
-    action[busy] = STOP_CHOICE
-    assert env.decode(action) == {}
-    action[busy] = env.n_choices - 1
-    idle = int(np.flatnonzero(env.sim.state.remaining == 0)[0])
-    action[idle] = env.n_choices - 1  # more than this machine's recipe count
-    assert idle not in env.decode(action) or len(env.sim.allowed[idle]) == env.n_choices - 2
+    start = env.start_action()
+    assert env.switches() == {}  # no plan yet
+    env.step(start)  # planning the starting allocation changes nothing
+    assert env.switches() == {}
+    assert env.start_action().tolist() == start.tolist()  # from the scenario, not from the current state
+
+    sc = env.sim.scenario
+    constructors = env.kinds[0]
+    plate = constructors.recipes.index(sc.recipe_index["Ingot_2_Plate"])
+    bar = constructors.recipes.index(sc.recipe_index["Ingot_2_Bar"])
+    action = start.copy()
+    action[constructors.slots.start + plate] = 2
+    action[constructors.slots.start + bar] = 4
+    for _ in range(60):
+        env.step(action)
+        for m in env.switches():
+            assert env.sim.idle[m]
+    assert env._current_counts(constructors).tolist() == env.plan[0].tolist()
+    assert env.plan[0][plate] == 2 and env.plan[0][bar] == 4
+
+    env.step(np.zeros_like(action))  # all zeros: keep the plan
+    assert env.plan[0][plate] == 2
+
+
+def test_changeover_delays_the_new_recipe():
+    sim = FactorySim(scenario_from_dict({**TINY, "changeover_time": 3}))
+    sim.reset(seed=0)
+    idle = sim.scenario.recipe_index["Idle"]
+    sim.step({0: idle})
+    assert sim.state.setup[0] == 2 and not sim.idle[0]
+    with pytest.raises(ValueError, match="is busy"):
+        sim.step({0: 0})
+    reports = [sim.step() for _ in range(2)]
+    assert sim.idle[0]  # 3 seconds of changeover have passed, making nothing
+    assert all(r.running[0] == STOP for r in reports)
+    assert sim.step().running[0] == idle  # starts on the next second
+    while not sim.idle[0]:
+        sim.step()
+    # Stopping needs no changeover; switching back to the same recipe after a stop does
+    sim.step({0: STOP})
+    assert sim.state.setup[0] == 0
+    sim.step({0: idle})
+    assert sim.state.setup[0] == 2
 
 
 def test_reward_matches_cash_change():
@@ -157,3 +192,28 @@ def test_recorder_and_save(tmp_path):
     assert {p.name for p in tmp_path.iterdir()} >= {
         "history.xlsx", "dashboard.png", "gantt.png", "material_flow.png"
     }
+
+def test_web_pages(tmp_path):
+    from sjfactory import web
+    from sjfactory.evaluate import baseline_policy, run_episode
+
+    env = FactoryEnv(horizon=200, ticks_per_action=5)
+    run = tmp_path / "0101_000000-keep"
+    run.mkdir()
+    rec = run_episode(env, baseline_policy("keep", env), seed=0)
+    ref = run_episode(env, baseline_policy("random", env), seed=0)
+    (run / "summary.json").write_text(json.dumps(rec.summary()), encoding="utf-8")
+    assert "Cash over time" in web.write_report(run, rec, "keep", {"random": ref}).read_text(encoding="utf-8")
+
+    # A training page from the files the training monitor writes, before any statistics exist
+    web.write_config(run, steps=1000, initial_cash=1000)
+    (run / "eval.csv").write_text(
+        "step,mode,seed,profit,fill_rate,busy,revenue,penalty\n0,fixed,1,5,0.1,0.5,10,0\n0,sampled,1,7,0.2,0.5,12,0\n",
+        encoding="utf-8",
+    )
+    page = web.write_training_page(run).read_text(encoding="utf-8")
+    assert 'http-equiv="refresh"' in page  # still running, so it reloads itself
+
+    index = web.write_index(tmp_path).read_text(encoding="utf-8")
+    assert run.name in index
+    assert (tmp_path / "plotly.min.js").exists()

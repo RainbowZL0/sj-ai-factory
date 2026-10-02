@@ -1,10 +1,12 @@
-# Default scenario: merged from the old spec_yaml/*.yaml files, same values.
+# Default scenario: merged from the old spec_yaml/*.yaml files. Since then a changeover time and
+# shortfall penalties were added, so switching recipes and missing orders both cost something.
 # One scenario = one file. Each material is listed here exactly once.
 
 horizon: 5000          # seconds per episode
 initial_cash: 1000
 energy_price: 0        # cost per kWh
 rent_per_second: 0.5
+changeover_time: 30    # seconds a machine makes nothing after switching to a different recipe
 
 # Materials. Fields left out default to 0:
 #   initial_stock      stock at the start
@@ -26,8 +28,8 @@ materials:
   Wire: {}
   Stator: {}
   ReinforcedPlate: {}
-  Motor: {sell_price: 800}
-  Frame: {sell_price: 300}
+  Motor: {sell_price: 800, shortfall_penalty: 400}
+  Frame: {sell_price: 300, shortfall_penalty: 150}
 
 # Recipes. category decides which kind of machine can run it; cycle_time is in seconds
 recipes:

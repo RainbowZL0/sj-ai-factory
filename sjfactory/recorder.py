@@ -97,15 +97,19 @@ class Recorder:
         s = self.scalars()
         d = self.deliveries_frame()
         busy = (self.running_matrix() != STOP).mean() if self.reports else 0.0
+        final_cash = float(s["cash"].iat[-1]) if len(s) else self.scenario.initial_cash
+        ordered, shipped = float(d["ordered"].sum()), float(d["shipped"].sum())
         return {
             "seconds": len(self.reports),
-            "final_cash": float(s["cash"].iat[-1]) if len(s) else self.scenario.initial_cash,
+            "profit": final_cash - self.scenario.initial_cash,
+            "fill_rate": shipped / ordered if ordered else 1.0,  # share of ordered units that shipped
+            "final_cash": final_cash,
             "revenue": float(s["revenue"].sum()),
             "penalty": float(s["penalty"].sum()),
             "energy_kwh": float(s["energy_kwh"].sum()),
             "orders_delivered": len(d),
-            "units_ordered": float(d["ordered"].sum()),
-            "units_shipped": float(d["shipped"].sum()),
+            "units_ordered": ordered,
+            "units_shipped": shipped,
             "machine_busy_ratio": float(busy),
         }
 

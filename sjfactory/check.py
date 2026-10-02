@@ -9,6 +9,8 @@ uv run python -m sjfactory --scenario scenarios/lab.yaml check [runs/<folder>/be
   sooner); no changeovers; every order known from the start. Every real schedule fits these rules, so no policy
   can beat it. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
   but no longer strict.
+- Look-ahead (sjfactory/lookahead.py): tries moves in a copy of the simulator each minute, so it sees
+  batches and input order too. Knows every order in advance.
 - Oracle (integer program): the model's own kind of decision, whole machines per recipe each minute, with a
   changeover per machine added, but knowing every order in advance. Its plan is played in the simulator.
   Not a strict bound: flow within a minute is treated as smooth, so the plan loses some profit when played.
@@ -224,7 +226,7 @@ def play_plan(env: FactoryEnv, seed, plan) -> Recorder:
 
 
 def _check_seed(job) -> dict:
-    scenario, horizon, models, seed, oracle_seconds = job
+    scenario, horizon, models, seed, oracle_seconds, lookahead_minutes = job
     import torch
 
     torch.set_num_threads(1)
@@ -237,6 +239,10 @@ def _check_seed(job) -> dict:
         out["oracle planned"], plan, _ = oracle(env, time_limit=oracle_seconds)
         out["oracle"] = play_plan(env, seed, plan).summary()
     out["keep"] = run_episode(env, baseline_policy("keep", env), seed=seed).summary()
+    if lookahead_minutes > 0:
+        from sjfactory.lookahead import LookaheadPolicy
+
+        out["look-ahead"] = run_episode(env, LookaheadPolicy(env, lookahead_minutes), seed=seed).summary()
     if models:
         from sb3_contrib import MaskablePPO
 
@@ -247,7 +253,8 @@ def _check_seed(job) -> dict:
 
 
 def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[int] = range(2000, 2010),
-              horizon: int | None = None, oracle_seconds: int = 30, workers: int | None = None) -> dict:
+              horizon: int | None = None, oracle_seconds: int = 30, lookahead_minutes: int = 30,
+              workers: int | None = None) -> dict:
     """Print the load table and the profit of keep, the oracle, models and the upper bound; returns the numbers"""
     env = FactoryEnv(scenario, horizon=horizon)
     sc = env.sim.scenario
@@ -264,7 +271,7 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
         print(f"  {p:10s}" + "".join(f"{x:18.1f}" for x in per) + f"{most:18.0f}")
 
     seeds = list(seeds)
-    jobs = [(str(scenario), horizon, list(models), s, oracle_seconds) for s in seeds]
+    jobs = [(str(scenario), horizon, list(models), s, oracle_seconds, lookahead_minutes) for s in seeds]
     with ProcessPoolExecutor(workers or min(len(jobs), os.cpu_count() or 1)) as pool:
         res = list(pool.map(_check_seed, jobs))
 
@@ -276,7 +283,7 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
           + ", ".join(f"{p} {d:.0f}" for p, d in demand.items()) + f", total {sum(demand.values()):.0f} units")
     print("Share of each kind's time these orders need: " + ", ".join(f"{k} {v:.0%}" for k, v in need.items()))
 
-    rows = ["keep", *models] + (["oracle"] if oracle_seconds > 0 else [])
+    rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else [])
     b = float(np.mean([r["bound"] for r in res]))
     summary = {"seeds": seeds, "demand": demand, "need": need, "bound": b}
     print(f"\nMean over {len(seeds)} episodes{'':30s}{'profit':>10s}{'of bound':>10s}{'shipped':>10s}{'busy':>8s}")

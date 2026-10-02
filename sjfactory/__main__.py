@@ -199,7 +199,7 @@ def cmd_check(args):
 
     run_check(
         args.scenario, args.models, range(args.first_seed, args.first_seed + args.episodes), horizon=args.horizon,
-        oracle_seconds=args.oracle_seconds, workers=args.workers,
+        oracle_seconds=args.oracle_seconds, lookahead_minutes=args.lookahead_minutes, workers=args.workers,
     )
 
 
@@ -251,6 +251,7 @@ def main():
     c.add_argument("models", nargs="*", help="trained models to compare, played with their most likely choice")
     c.add_argument("--episodes", type=int, default=10, help="seeds checked, starting at --seed")
     c.add_argument("--oracle-seconds", type=int, default=30, help="time limit per oracle solve; 0 skips the oracle")
+    c.add_argument("--lookahead-minutes", type=int, default=30, help="look-ahead planner's window; 0 skips it")
     c.add_argument("--workers", type=int, default=None, help="processes (default: one per episode, up to the cores)")
     c.add_argument("--first-seed", type=int, default=2000, help="first seed; no training run tests on 2000 and up")
     c.set_defaults(func=cmd_check)

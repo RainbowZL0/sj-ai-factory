@@ -18,6 +18,7 @@ initial_cash: 1000
 energy_price: 0        # cost per kWh
 rent_per_second: 0.5
 changeover_time: 30    # seconds a machine makes nothing after switching to a different recipe
+input_priority: downstream  # when stock is short, machines furthest from the raw materials get inputs first
 
 # Materials. Fields left out default to 0:
 #   initial_stock      stock at the start

@@ -336,3 +336,14 @@ def test_three_product_lab_loads_with_its_variant_chain():
     assert sc.input_priority == "downstream" and sc.products == ("Motor", "Frame", "Pump")
     assert unit_load(sc)["Pump"] == {"Assembler": 30.0, "Constructor": 50.0, "Smelter": 40.0}
     assert sc.random_orders.notice_range == (600, 1800)  # from lab.yaml, two files up
+
+
+def test_lookahead_tries_do_not_change_the_episode():
+    from sjfactory.evaluate import run_episode
+    from sjfactory.lookahead import LookaheadPolicy
+
+    env = FactoryEnv(horizon=1200, ticks_per_action=60)
+    first = run_episode(env, LookaheadPolicy(env, 5), seed=3)
+    again = run_episode(env, LookaheadPolicy(env, 5), seed=3)
+    assert len(first.reports) == 1200  # the recording holds the real seconds only, not the tries
+    assert first.summary() == again.summary()

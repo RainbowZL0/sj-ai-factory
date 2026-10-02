@@ -50,7 +50,7 @@ Variants (each a few lines on top of `lab.yaml`):
 `uv run python -m sjfactory --scenario <file> check [models ...]` prints, in under a minute:
 - the machine seconds each product needs from each kind, and the most of each product per episode;
 - the orders, and the share of each kind's time they need;
-- the profit of keep, any models given, the oracle and the upper bound (see [experiment 9](../experiments/09-bottleneck-analysis.md)), on seeds 2000 to 2009, each as a share of the upper bound. The bound and the oracle count energy and storage costs; storage is charged on the stock at the end of each period, so with storage costs the bound is close but not strict.
+- the profit of keep, any models given, the look-ahead planner (`lookahead.py`: tries each move in a copy of the simulator, 30 minutes ahead, so it sees batches and input order; slower and weaker than a trained model), the oracle and the upper bound (see [experiment 9](../experiments/09-bottleneck-analysis.md)), on seeds 2000 to 2009, each as a share of the upper bound. The bound and the oracle count energy and storage costs; storage is charged on the stock at the end of each period, so with storage costs the bound is close but not strict.
 
 Use it to see whether a change to the factory changes anything before spending a training run on it.
 

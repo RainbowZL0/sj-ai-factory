@@ -4,6 +4,7 @@
 # A Pump needs 40 s of smelter time, 50 s of constructor time and 30 s of assembler time. Plates now go both
 # to assemblers and to gear making, a step earlier, so who gets plates first matters.
 base: lab.yaml
+input_priority: machine_order  # as in experiment 12, where this starves the line; lab-three-downstream.yaml fixes it
 
 materials:
   Gear: {}

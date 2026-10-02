@@ -36,7 +36,7 @@ from sjfactory.evaluate import baseline_policy, model_env_options, model_episode
 from sjfactory.policies import KeepPolicy
 from sjfactory.recorder import Recorder
 from sjfactory.sim import STOP
-from sjfactory.spec import Scenario, unit_load  # noqa: F401  (unit_load is used here and by tests)
+from sjfactory.spec import PROJECT_ROOT, Scenario, unit_load  # noqa: F401  (unit_load is used here and by tests)
 
 L = 10  # seconds per period in the upper bound
 P = 60  # seconds per period in the oracle, the same as one decision
@@ -306,21 +306,22 @@ def _check_seed(job) -> dict:
 
 def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[int] = range(2000, 2010),
               horizon: int | None = None, oracle_seconds: int = 30, lookahead_minutes: int = 30,
-              workers: int | None = None) -> dict:
+              workers: int | None = None, verbose: bool = True) -> dict:
     """Print the load table and the profit of keep, the oracle, models and the upper bound; returns the numbers"""
+    say = print if verbose else (lambda *a, **k: None)
     env = FactoryEnv(scenario, horizon=horizon)
     sc = env.sim.scenario
     kinds = list(dict.fromkeys(m.category for m in sc.machines))
     n_kind = {k: sum(m.category == k for m in sc.machines) for k in kinds}
     load = unit_load(sc)
 
-    print(f"{scenario}: {len(sc.machines)} machines, {sc.horizon} s per episode, changeover {sc.changeover_time} s")
-    print("\nMachine seconds per unit, divided by the machines of that kind:")
-    print(f"  {'':10s}" + "".join(f"{f'{k} ({n_kind[k]})':>18s}" for k in kinds) + f"{'most per episode':>18s}")
+    say(f"{scenario}: {len(sc.machines)} machines, {sc.horizon} s per episode, changeover {sc.changeover_time} s")
+    say("\nMachine seconds per unit, divided by the machines of that kind:")
+    say(f"  {'':10s}" + "".join(f"{f'{k} ({n_kind[k]})':>18s}" for k in kinds) + f"{'most per episode':>18s}")
     for p, sec in load.items():
         per = [sec.get(k, 0.0) / n_kind[k] for k in kinds]
         most = sc.horizon / max(per) if max(per) > 0 else float("inf")
-        print(f"  {p:10s}" + "".join(f"{x:18.1f}" for x in per) + f"{most:18.0f}")
+        say(f"  {p:10s}" + "".join(f"{x:18.1f}" for x in per) + f"{most:18.0f}")
 
     seeds = list(seeds)
     jobs = [(str(scenario), horizon, list(models), s, oracle_seconds, lookahead_minutes) for s in seeds]
@@ -331,14 +332,14 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
     # Share of each kind's time the orders need, if no machine ever waited or switched
     need = {k: np.mean([sum(r["demand"][p] * load[p].get(k, 0) for p in sc.products) for r in res])
             / (n_kind[k] * sc.horizon) for k in kinds}
-    print(f"\nOrders, mean over seeds {seeds[0]}-{seeds[-1]}: "
+    say(f"\nOrders, mean over seeds {seeds[0]}-{seeds[-1]}: "
           + ", ".join(f"{p} {d:.0f}" for p, d in demand.items()) + f", total {sum(demand.values()):.0f} units")
-    print("Share of each kind's time these orders need: " + ", ".join(f"{k} {v:.0%}" for k, v in need.items()))
+    say("Share of each kind's time these orders need: " + ", ".join(f"{k} {v:.0%}" for k, v in need.items()))
 
     rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else [])
     b = float(np.mean([r["bound"] for r in res]))
     summary = {"seeds": seeds, "demand": demand, "need": need, "bound": b}
-    print(f"\nMean over {len(seeds)} episodes{'':30s}{'profit':>10s}{'of bound':>10s}{'shipped':>10s}{'busy':>8s}   units shipped")
+    say(f"\nMean over {len(seeds)} episodes{'':30s}{'profit':>10s}{'of bound':>10s}{'shipped':>10s}{'busy':>8s}   units shipped")
     for key in rows:
         s = [r[key] for r in res]
         profit = float(np.mean([x["profit"] for x in s]))
@@ -347,21 +348,58 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
         units = {p: float(np.mean([x["by_product"][p] for x in s])) for p in sc.products}
         summary[key] = {"profit": profit, "fill_rate": fill, "busy": busy, "units": units}
         label = key if len(key) <= 50 else "..." + key[-47:]
-        print(f"  {label:50s}{profit:10,.0f}{profit / b if b > 0 else float('nan'):10.0%}{fill:10.0%}{busy:8.0%}"
+        say(f"  {label:50s}{profit:10,.0f}{profit / b if b > 0 else float('nan'):10.0%}{fill:10.0%}{busy:8.0%}"
               + "   " + ", ".join(f"{p} {u:.0f}" for p, u in units.items()))
     if oracle_seconds > 0:
         # What the oracle expected: the gap to "oracle" is lost to flow within a minute (batches, waiting for inputs)
         planned = float(np.mean([r["oracle planned"] for r in res]))
         summary["oracle planned"] = planned
-        print(f"  {'oracle, as planned':50s}{planned:10,.0f}{planned / b if b > 0 else float('nan'):10.0%}")
-    print(f"  {'upper bound':50s}{b:10,.0f}")
+        say(f"  {'oracle, as planned':50s}{planned:10,.0f}{planned / b if b > 0 else float('nan'):10.0%}")
+    say(f"  {'upper bound':50s}{b:10,.0f}")
 
     # Where the machine time went: only work in shipped units earns money
     parts = ["shipped", "unsold", "parts", "switching", "waiting"]
-    print(f"\nShare of all machine time{'':25s}" + "".join(f"{p:>11s}" for p in parts))
+    say(f"\nShare of all machine time{'':25s}" + "".join(f"{p:>11s}" for p in parts))
     for key in rows:
         split = {p: float(np.mean([r[key]["time"][p] for r in res])) for p in parts}
         summary[key]["time"] = split
         label = key if len(key) <= 50 else "..." + key[-47:]
-        print(f"  {label:48s}" + "".join(f"{split[p]:11.0%}" for p in parts))
+        say(f"  {label:48s}" + "".join(f"{split[p]:11.0%}" for p in parts))
     return summary
+
+
+# The fixed set of days a change is judged on (roadmap milestone 4): (scenario, what kind of day, seeds)
+BENCH = (
+    ("scenarios/lab-mixed.yaml", "light to busy", range(2000, 2020)),
+    ("scenarios/lab-busy.yaml", "busy", range(2000, 2010)),
+    ("scenarios/lab-three-downstream.yaml", "third product", range(2000, 2010)),
+)
+
+
+def model_fits(path: str, scenario: str | Path) -> bool:
+    """True if the model can play this scenario: same observation and action sizes"""
+    from sb3_contrib import MaskablePPO
+
+    model = MaskablePPO.load(path, device="cpu")
+    env = FactoryEnv(scenario, ticks_per_action=P, **model_env_options(path))
+    return (model.observation_space.shape == env.observation_space.shape
+            and list(model.action_space.nvec) == list(env.action_space.nvec))
+
+
+def run_bench(models: Sequence[str] = (), oracle_seconds: int = 30, lookahead_minutes: int = 0,
+              workers: int | None = None) -> dict:
+    """Run check on every scenario in BENCH and print each policy's share of the upper bound per kind of day.
+    A model is only played on scenarios it fits (a model for two products can't play three)."""
+    results = {}
+    for scenario, label, seeds in BENCH:
+        fit = [m for m in models if model_fits(m, PROJECT_ROOT / scenario)]
+        print(f"{scenario} ({label}, {len(seeds)} days)...", flush=True)
+        results[scenario] = run_check(PROJECT_ROOT / scenario, fit, seeds, oracle_seconds=oracle_seconds,
+                                      lookahead_minutes=lookahead_minutes, workers=workers, verbose=False)
+    rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else [])
+    print(f"\nShare of the upper bound{'':26s}" + "".join(f"{label:>16s}" for _, label, _ in BENCH))
+    for key in rows:
+        cells = [results[s][key]["profit"] / results[s]["bound"] if key in results[s] else None for s, _, _ in BENCH]
+        label = key if len(key) <= 50 else "..." + key[-47:]
+        print(f"  {label:48s}" + "".join(f"{c:16.0%}" if c is not None else f"{'-':>16s}" for c in cells))
+    return results

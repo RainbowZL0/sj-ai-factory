@@ -66,6 +66,7 @@ uv run python -m sjfactory --note "what I changed" train --steps 1000000   # Mas
 uv run python -m sjfactory eval runs/<folder>/best_model.zip --mode sampled   # or --mode fixed
 uv run python -m sjfactory view                      # list of all runs in the browser
 uv run python -m sjfactory check                     # machine load, keep, oracle and upper bound in under a minute, no training
+uv run python -m sjfactory bench runs/<folder>/best_model.zip   # share of the upper bound on each kind of test day
 uv run pytest
 ```
 

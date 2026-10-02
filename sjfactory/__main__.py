@@ -5,6 +5,7 @@ uv run python -m sjfactory train --steps 1000000 --note "what I changed"
 uv run python -m sjfactory eval runs/<time>-train/best_model.zip --mode sampled
 uv run python -m sjfactory view                 # open the page listing all runs
 uv run python -m sjfactory check [models ...]   # machine load, keep, oracle and upper bound, no training
+uv run python -m sjfactory bench [models ...]   # check on the fixed set of test days, one line per policy
 """
 
 from __future__ import annotations
@@ -208,6 +209,13 @@ def cmd_check(args):
     )
 
 
+def cmd_bench(args):
+    from sjfactory.check import run_bench
+
+    run_bench(args.models, oracle_seconds=args.oracle_seconds, lookahead_minutes=args.lookahead_minutes,
+              workers=args.workers)
+
+
 def main():
     p = argparse.ArgumentParser(prog="sjfactory")
     p.add_argument("--scenario", default=str(DEFAULT_SCENARIO))
@@ -264,6 +272,13 @@ def main():
     c.add_argument("--workers", type=int, default=None, help="processes (default: one per episode, up to the cores)")
     c.add_argument("--first-seed", type=int, default=2000, help="first seed; no training run tests on 2000 and up")
     c.set_defaults(func=cmd_check)
+
+    b = sub.add_parser("bench", help="check on the fixed set of test days; one share of the bound per kind of day")
+    b.add_argument("models", nargs="*", help="trained models; each plays the scenarios it fits")
+    b.add_argument("--oracle-seconds", type=int, default=30, help="time limit per oracle solve; 0 skips the oracle")
+    b.add_argument("--lookahead-minutes", type=int, default=0, help="look-ahead planner's window; 0 (default) skips it")
+    b.add_argument("--workers", type=int, default=None, help="processes (default: one per episode, up to the cores)")
+    b.set_defaults(func=cmd_bench)
 
     args = p.parse_args()
     args.func(args)

@@ -54,6 +54,8 @@ Variants used only by experiments 11 and 13 (storage costs, a single tight kind,
 
 Use it to see whether a change to the factory changes anything before spending a training run on it.
 
+`uv run python -m sjfactory bench [models ...]` runs `check` on a fixed set of test days (`BENCH` in `check.py`: 20 light-to-busy days from `lab-mixed.yaml`, 10 busy days, 10 days of the three-product lab) and prints one line per policy: its share of the upper bound on each kind of day. A model only plays the scenarios it fits (a model for two products can't play three). It takes a few minutes; this is the score the [roadmap](../roadmap.md) aims at.
+
 ## The large factory (`scenarios/large/`)
 
 The factory of experiments 1 to 9, now parked. `casters-downstream.yaml` is the casters factory with `input_priority: downstream`.

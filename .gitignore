@@ -19,4 +19,6 @@ pics/
 logs/
 *.xlsx
 *.png
+# The few pictures shown on the README are kept on purpose
+!docs/images/*.png
 *.zip

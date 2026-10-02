@@ -1,7 +1,0 @@
-- name: "Frame"
-  quantity: 0
-  due_time: 1
-
-- name: "Motor"
-  quantity: 0
-  due_time: 1

@@ -13,3 +13,10 @@ uv.lock
 
 # Run outputs
 runs/
+
+# Generated outputs (charts, Excel, models). Never commit these.
+pics/
+logs/
+*.xlsx
+*.png
+*.zip

@@ -2,7 +2,7 @@
 
 <p align="center">
   A factory simulator where a reinforcement learning model decides which machine makes what.<br>
-  Work in progress: on normal days it already matches a planner that knows every order in advance.
+  Work in progress: it already beats planners that know only the orders announced so far.
 </p>
 
 <p align="center">
@@ -18,15 +18,17 @@
 
 Reinforcement learning (RL) means a program learns by trial and error, guided by a reward score. Here the reward is money earned. Every minute the model may move one machine of each kind to another recipe, and the simulator plays out the next minute. Customers order products with a due time, and an order is paid only if it ships in full; a short order is fined.
 
-This project is still in development. Results so far, on the small lab factory (`scenarios/lab.yaml`), mean over 10 new days (seeds 2000 to 2009):
+This project is still in development. Results so far, on the small lab factory (`scenarios/lab.yaml` and its variants):
 
-| Policy | Normal day (`lab`) | Busy day (`lab-busy`) |
+| Policy | Light to busy days | Busy days |
 |---|---|---|
-| **Trained model** (500k decisions, about 4 minutes) | **109.8k (89%)** | 101.5k (79%) |
-| Oracle: an integer program that knows every order in advance | 109.0k (88%) | **112.1k (87%)** |
-| Keep: every machine stays on its starting recipe | -2.9k | -31.8k |
+| **Trained model** (2M decisions on busy days, about 20 minutes) | **88%** | **87%** |
+| Planner that re-plans every 5 minutes from the orders announced so far | 86% | 82% |
+| Oracle: plans once, knowing every order in advance | 87% | 85% |
+| Planner that re-plans every 5 minutes, knowing every order in advance | 91% | 90% |
+| Keep: every machine stays on its starting recipe | -22% | -31% |
 
-The share in brackets is of the upper bound, a profit no schedule can beat. On normal days the model matches the oracle; on busy days, where it must choose which orders to give up, it is still behind. The [roadmap](docs/roadmap.md) says what we aim for and what comes next.
+Numbers are shares of the upper bound, a profit no schedule can beat, over 30 days each (`uv run python -m sjfactory bench`). The model beats every planner that knows only what it knows; only a planner that sees the future does better. The [roadmap](docs/roadmap.md) says what we aim for and what comes next.
 
 ## How it works
 

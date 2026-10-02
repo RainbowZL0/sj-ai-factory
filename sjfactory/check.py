@@ -16,6 +16,9 @@ uv run python -m sjfactory --scenario scenarios/lab.yaml check [runs/<folder>/be
 - Oracle (integer program): the model's own kind of decision, whole machines per recipe each minute, with a
   changeover per machine added, but knowing every order in advance. Its plan is played in the simulator.
   Not a strict bound: flow within a minute is treated as smooth, so the plan loses some profit when played.
+- Re-planned (--replan-minutes): the oracle solved again from the real state every few minutes, aiming to have
+  each order ready a minute early, so slips in the simulator get corrected. "All orders" knows every order in
+  advance; "known orders" only those announced so far, the same knowledge the model has: a fair yardstick.
 - Machine time: where each policy's machine time went (work in shipped units, in products left unsold, in
   other parts, changeovers, waiting). Only the first earns money.
 """
@@ -40,6 +43,8 @@ from sjfactory.spec import PROJECT_ROOT, Scenario, unit_load  # noqa: F401  (uni
 
 L = 10  # seconds per period in the upper bound
 P = 60  # seconds per period in the oracle, the same as one decision
+MARGIN = 60  # seconds early the re-planning oracle aims to have each order ready (experiment 17)
+REPLAN_ROWS = ["re-planned, all orders", "re-planned, known orders"]
 
 
 def bound(env: FactoryEnv, whole_orders: bool | None = None) -> float:
@@ -131,22 +136,27 @@ def _all_penalties(env: FactoryEnv) -> float:
     return sum(o.quantity * sim.shortfall_penalty[sc.material_index[o.product]] for o in sim.state.orders)
 
 
-def oracle(env: FactoryEnv, time_limit=60):
-    """Best minute-by-minute plan knowing every order: (planned profit, plan[minute, recipe], solver result)"""
-    sim, sc = env.sim, env.sim.scenario
-    orders = sim.state.orders
+def oracle(env: FactoryEnv, time_limit=60, margin: int = 0, known_only: bool = False):
+    """Best minute-by-minute plan from the current state to the end of the episode, knowing every order still
+    to come: (planned profit from now on, plan[minute from now, recipe], solver result).
+    With a margin (seconds), each order must be in stock that much before it is due, which leaves room for the
+    delays a played plan meets. With known_only, only orders already announced count, as for the model."""
+    sim, sc, s = env.sim, env.sim.scenario, env.sim.state
+    orders = [o for o in s.orders if not o.declined and (not known_only or o.known_time <= s.clock)]
     R, M = len(sc.recipes), len(sc.materials)
-    T = -(-sc.horizon // P)
+    left = sc.horizon - s.clock
+    T = -(-left // P)
     plen = np.full(T, P)
-    plen[-1] = sc.horizon - P * (T - 1)
+    plen[-1] = left - P * (T - 1)
     cats = sorted({m.category for m in sc.machines})
     n_cat = {c: sum(m.category == c for m in sc.machines) for c in cats}
     lag = sim.cycle_time // P
     co = sc.changeover_time
-    start = np.zeros(R)
-    for m in sc.machines:
-        if m.initial_recipe:
-            start[sc.recipe_index[m.initial_recipe]] += 1
+    start = np.bincount(s.recipe[s.recipe != STOP], minlength=R).astype(float)
+    # batches already running: their inputs are taken, their outputs arrive in the minute they finish
+    arriving = np.zeros((T, M))
+    for m in np.flatnonzero(s.remaining > 0):
+        arriving[min(T - 1, (s.remaining[m] - 1) // P)] += sim.recipe_out[s.recipe[m]]
     no = len(orders)
     # variable blocks: n[t,r] whole machines, u[t,r] busy machine-seconds, add[t,r] machines added, I[t,m] stock, s[o]
     N, U, AD, I, S = 0, T * R, 2 * T * R, 3 * T * R, 3 * T * R + T * M
@@ -178,9 +188,9 @@ def oracle(env: FactoryEnv, time_limit=60):
                 if sim.recipe_in[r, m] > 0:
                     e.append((U + t * R + r, sim.recipe_in[r, m] / sim.cycle_time[r]))
             for i, o in enumerate(orders):
-                if sc.material_index[o.product] == m and min(T - 1, (o.due_time - 1) // P) == t:
+                if sc.material_index[o.product] == m and min(T - 1, max(0, o.due_time - 1 - margin - s.clock) // P) == t:
                     e.append((S + i, 1.0))
-            b = sc.materials[m].initial_stock if t == 0 else 0.0
+            b = arriving[t, m] + (s.stock[m] if t == 0 else 0.0)
             row(e, b, b)
     A = sp.csr_matrix((vals, (rows, cols)), shape=(k, nv))
     c = np.zeros(nv)
@@ -205,7 +215,8 @@ def oracle(env: FactoryEnv, time_limit=60):
         integrality = np.concatenate([integrality, np.ones(no)])
     res = milp(c, constraints=LinearConstraint(A, lo, hi), bounds=Bounds(0, ub), integrality=integrality,
                options={"time_limit": time_limit, "mip_rel_gap": 0.01})
-    value = -res.fun - _all_penalties(env) - sc.rent_per_second * sc.horizon
+    fines = sum(o.quantity * sim.shortfall_penalty[sc.material_index[o.product]] for o in orders)
+    value = -res.fun - fines - sc.rent_per_second * left
     plan = np.rint(res.x[N:U].reshape(T, R)).astype(int)
     return value, plan, res
 
@@ -215,7 +226,7 @@ def chosen_orders(env: FactoryEnv, res) -> np.ndarray | None:
     None when the scenario allows partial delivery (then there is no yes/no choice per order)."""
     if env.sim.scenario.partial_delivery or res.x is None:
         return None
-    return res.x[-len(env.sim.state.orders):] > 0.5
+    return res.x[-len(env.sim.state.orders):] > 0.5  # right after reset no order is declined or unknown to it
 
 
 def play_plan(env: FactoryEnv, seed, plan, keep_orders: np.ndarray | None = None) -> Recorder:
@@ -229,17 +240,41 @@ def play_plan(env: FactoryEnv, seed, plan, keep_orders: np.ndarray | None = None
         keep = KeepPolicy(env.action_space)
         t, done = 0, False
         while not done:
-            for i, k in enumerate(env.kinds):
-                target = plan[min(t, len(plan) - 1), list(k.recipes)].copy()
-                # machines the oracle leaves unused stay where they are (no needless changeover)
-                for j in np.argsort(-(env.plan[i] - target)):
-                    target[j] += max(0, min(env.plan[i][j] - target[j], len(k.machines) - target.sum()))
-                if (target != env.plan[i]).any():
-                    env.plan[i] = target.copy()
-                    env._unreached.add(i)
+            _set_plan(env, plan[min(t, len(plan) - 1)])
             _, _, done, _, _ = env.step(keep.act(None, None))
             t += 1
     return rec
+
+
+def play_replanned(env: FactoryEnv, seed, every: int = 5, time_limit=10, margin: int = 0,
+                   known_only: bool = False) -> Recorder:
+    """Play the oracle, solving again from the real state every `every` minutes, so a plan that slipped in
+    the simulator (an order a few units short, a machine waiting for inputs) is corrected. With known_only it
+    only plans for orders already announced, the same knowledge the model has: a fair yardstick for short notice."""
+    with Recorder(env.sim) as rec:
+        env.reset(seed=seed)
+        keep = KeepPolicy(env.action_space)
+        t, done, plan, since = 0, False, None, 0
+        while not done:
+            if t % every == 0:
+                _, plan, _ = oracle(env, time_limit, margin, known_only)
+                since = t
+            _set_plan(env, plan[min(t - since, len(plan) - 1)])
+            _, _, done, _, _ = env.step(keep.act(None, None))
+            t += 1
+    return rec
+
+
+def _set_plan(env: FactoryEnv, row: np.ndarray):
+    """Make env's plan follow one minute of an oracle plan (machines per recipe)"""
+    for i, k in enumerate(env.kinds):
+        target = row[list(k.recipes)].copy()
+        # machines the oracle leaves unused stay where they are (no needless changeover)
+        for j in np.argsort(-(env.plan[i] - target)):
+            target[j] += max(0, min(env.plan[i][j] - target[j], len(k.machines) - target.sum()))
+        if (target != env.plan[i]).any():
+            env.plan[i] = target.copy()
+            env._unreached.add(i)
 
 
 def time_split(rec: Recorder) -> dict[str, float]:
@@ -277,7 +312,7 @@ def _summary(rec: Recorder) -> dict:
 
 
 def _check_seed(job) -> dict:
-    scenario, horizon, models, seed, oracle_seconds, lookahead_minutes = job
+    scenario, horizon, models, seed, oracle_seconds, lookahead_minutes, replan_minutes = job
     import torch
 
     torch.set_num_threads(1)
@@ -290,6 +325,9 @@ def _check_seed(job) -> dict:
         out["oracle planned"], plan, _ = oracle(env, time_limit=oracle_seconds)
         out["oracle"] = _summary(play_plan(env, seed, plan))
     out["keep"] = _summary(run_episode(env, baseline_policy("keep", env), seed=seed))
+    if replan_minutes > 0:
+        for key, known in zip(REPLAN_ROWS, (False, True)):
+            out[key] = _summary(play_replanned(env, seed, replan_minutes, max(oracle_seconds, 30), MARGIN, known))
     if lookahead_minutes > 0:
         from sjfactory.lookahead import LookaheadPolicy
 
@@ -305,7 +343,7 @@ def _check_seed(job) -> dict:
 
 
 def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[int] = range(2000, 2010),
-              horizon: int | None = None, oracle_seconds: int = 30, lookahead_minutes: int = 30,
+              horizon: int | None = None, oracle_seconds: int = 30, lookahead_minutes: int = 30, replan_minutes: int = 0,
               workers: int | None = None, verbose: bool = True) -> dict:
     """Print the load table and the profit of keep, the oracle, models and the upper bound; returns the numbers"""
     say = print if verbose else (lambda *a, **k: None)
@@ -324,7 +362,7 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
         say(f"  {p:10s}" + "".join(f"{x:18.1f}" for x in per) + f"{most:18.0f}")
 
     seeds = list(seeds)
-    jobs = [(str(scenario), horizon, list(models), s, oracle_seconds, lookahead_minutes) for s in seeds]
+    jobs = [(str(scenario), horizon, list(models), s, oracle_seconds, lookahead_minutes, replan_minutes) for s in seeds]
     with ProcessPoolExecutor(workers or min(len(jobs), os.cpu_count() or 1)) as pool:
         res = list(pool.map(_check_seed, jobs))
 
@@ -336,7 +374,7 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
           + ", ".join(f"{p} {d:.0f}" for p, d in demand.items()) + f", total {sum(demand.values()):.0f} units")
     say("Share of each kind's time these orders need: " + ", ".join(f"{k} {v:.0%}" for k, v in need.items()))
 
-    rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else [])
+    rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else []) + (REPLAN_ROWS if replan_minutes > 0 else [])
     b = float(np.mean([r["bound"] for r in res]))
     summary = {"seeds": seeds, "demand": demand, "need": need, "bound": b}
     say(f"\nMean over {len(seeds)} episodes{'':30s}{'profit':>10s}{'of bound':>10s}{'shipped':>10s}{'busy':>8s}   units shipped")
@@ -368,11 +406,12 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
     return summary
 
 
-# The fixed set of days a change is judged on (roadmap milestone 4): (scenario, what kind of day, seeds)
+# The fixed set of days a change is judged on (roadmap milestone 4): (scenario, what kind of day, seeds).
+# 30 days each: on 10 busy days the share of the bound moved by up to 6 points with the days drawn (experiment 16).
 BENCH = (
-    ("scenarios/lab-mixed.yaml", "light to busy", range(2000, 2020)),
-    ("scenarios/lab-busy.yaml", "busy", range(2000, 2010)),
-    ("scenarios/lab-three-downstream.yaml", "third product", range(2000, 2010)),
+    ("scenarios/lab-mixed.yaml", "light to busy", range(2000, 2030)),
+    ("scenarios/lab-busy.yaml", "busy", range(2000, 2030)),
+    ("scenarios/lab-three-downstream.yaml", "third product", range(2000, 2030)),
 )
 
 
@@ -386,7 +425,7 @@ def model_fits(path: str, scenario: str | Path) -> bool:
             and list(model.action_space.nvec) == list(env.action_space.nvec))
 
 
-def run_bench(models: Sequence[str] = (), oracle_seconds: int = 30, lookahead_minutes: int = 0,
+def run_bench(models: Sequence[str] = (), oracle_seconds: int = 30, lookahead_minutes: int = 0, replan_minutes: int = 5,
               workers: int | None = None) -> dict:
     """Run check on every scenario in BENCH and print each policy's share of the upper bound per kind of day.
     A model is only played on scenarios it fits (a model for two products can't play three)."""
@@ -395,8 +434,9 @@ def run_bench(models: Sequence[str] = (), oracle_seconds: int = 30, lookahead_mi
         fit = [m for m in models if model_fits(m, PROJECT_ROOT / scenario)]
         print(f"{scenario} ({label}, {len(seeds)} days)...", flush=True)
         results[scenario] = run_check(PROJECT_ROOT / scenario, fit, seeds, oracle_seconds=oracle_seconds,
-                                      lookahead_minutes=lookahead_minutes, workers=workers, verbose=False)
-    rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else [])
+                                      lookahead_minutes=lookahead_minutes, replan_minutes=replan_minutes,
+                                      workers=workers, verbose=False)
+    rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else []) + (REPLAN_ROWS if replan_minutes > 0 else [])
     print(f"\nShare of the upper bound{'':26s}" + "".join(f"{label:>16s}" for _, label, _ in BENCH))
     for key in rows:
         cells = [results[s][key]["profit"] / results[s]["bound"] if key in results[s] else None for s, _, _ in BENCH]

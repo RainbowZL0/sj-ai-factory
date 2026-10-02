@@ -405,6 +405,19 @@ def test_order_slack_leaves_out_orders_that_do_not_fit():
     assert slack.tolist() == [50, -100, 350]
 
 
+def test_replanned_oracle_plays_a_whole_episode():
+    from sjfactory.check import oracle, play_plan, play_replanned
+
+    env = FactoryEnv(horizon=1200, ticks_per_action=60)
+    env.reset(seed=2000)
+    _, plan, _ = oracle(env, 10)
+    once = play_plan(env, 2000, plan).summary()
+    # re-planning less often than the episode is long plays the same single plan
+    assert play_replanned(env, 2000, every=20, time_limit=10).summary() == once
+    for known in (False, True):
+        assert play_replanned(env, 2000, every=5, time_limit=10, known_only=known).summary()["seconds"] == 1200
+
+
 def test_machine_time_split_adds_up():
     from sjfactory.check import time_split
     from sjfactory.evaluate import run_episode

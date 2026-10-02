@@ -17,22 +17,36 @@ $$\text{best plan knowing only today's orders} \le \text{best plan knowing every
 
 The first can't be computed, so we measure against the tightest one we can compute and say which one it is.
 
-**Goal:** on a fixed set of test days, from light to busy, the model is at least as good as the oracle (the
-planner that knows every order in advance) on every kind of day, and leaves less than 10% of the tightest
-bound on the table on average.
+We now have computable stand-ins for the first two levels (experiment 17): the oracle re-planned every 5
+minutes from the real state, once knowing only the orders announced so far (a fair planner: the model's own
+knowledge) and once knowing every order. The best plan knowing only today's orders lies between them.
 
-## Why busy days come first
+**Goal:** on every kind of test day in `bench`, the model is at least as good as the fair planner and the
+oracle, and as close as possible to the planner that knows every order.
 
-- On normal days almost every order can be made, so the job is only to divide machine time. The model already
-  matches the oracle there (89-91% of the upper bound). Little money is left to win.
-- On busy days there are more orders than the factory can make, and since experiment 14 an order is paid only
-  if it ships in full. A plan must give up whole orders on purpose, and choosing badly is expensive: work spent
-  on an order that is dropped later is lost, and the order is fined its full price. This is where the model is
-  furthest behind (79% against the oracle's 87%).
-- Busy days hide two different problems. **Which orders to take** is a choice among about 30 to 50 orders that
-  a solver can make exactly in well under a second, but a trained model must learn it from fines that arrive
-  up to 30 minutes after the decision. **How to run the line minute by minute** is where the trained model is
-  already strong; it beats the oracle when the line can starve (`lab-three`: 93% against 53%).
+## Where things stand (2026-10-03)
+
+`bench`, share of the upper bound, 30 days per kind of day:
+
+| Policy | Light to busy | Busy | Third product |
+|---|---|---|---|
+| Best model | 88% | 87% | 86% |
+| Re-planned, every order known | 91% | 90% | 63% |
+| Re-planned, announced orders only (fair) | 86% | 82% | 59% |
+| Oracle, planned once | 87% | 85% | 69% |
+
+The goal is met on the days the lab has today. The model beats the fair planner by 2 to 5 points and is 3 points
+below the planner that sees the future, so on these days the remaining gain lies in guessing future orders.
+Next: days where reacting matters more (milestone 5).
+
+## Why busy days came first
+
+- On normal days almost every order can be made, so the job is only to divide machine time, and the model
+  already matched the oracle there.
+- On busy days there are more orders than the factory can make, and an order is paid only if it ships in
+  full, so a plan must give up whole orders on purpose. After experiment 14 this looked like the weak spot
+  (79% against the oracle's 87%); experiments 15 to 17 showed most of that gap was the choice of test days
+  and too little training.
 
 ## Milestones
 
@@ -56,34 +70,39 @@ but 10% of all machine time ends in finished products nobody buys (oracle 6%): u
 came up short. Declining orders on purpose does not help the oracle, so stock going to the wrong order is not
 the cause either. The model needs to see which orders still fit.
 
-### 3. Close the busy-day gap
+### 3. Close the busy-day gap (done, [experiment 16](experiments/16-busy-days-longer-training.md))
 
-Try, cheapest first, and stop when the model reaches the oracle on `lab-busy`:
-1. Longer training on `lab-busy` (gamma stays 0.97).
-2. Show the model, for the known orders, how much machine time they need compared with the time left before
-   each is due, so it can see which orders still fit.
-3. Let the model drop an order on purpose, so nothing more is spent on it.
-4. If the model still can't learn the choice: a small solver picks the orders each minute and the model runs
-   the line for them. Kept as its own policy, so pure model and solver-plus-model can be compared.
+1. Longer training on `lab-busy` (2M steps instead of 500k): closes the gap. On 30 busy days the model gets
+   86-87%, the oracle 85%. On only 10 days the share moves by up to 6 points with the days drawn, which made
+   the gap look bigger than it was.
+2. Showing the model which orders still fit (`train --order-slack`): no measurable gain (+740 per day, margin
+   ±2,100). Kept as an option.
+3. and 4. (letting the model drop orders, a solver picking orders) were not needed.
 
-### 4. One score for all kinds of days (first version done)
+Also learned: the "best" model, picked on 3 test seeds, is often worse on new days than the final model.
 
-`uv run python -m sjfactory bench [models ...]` runs `check` on a fixed set of days (`BENCH` in `check.py`):
-20 light-to-busy days (`lab-mixed`), 10 busy days (`lab-busy`) and 10 days of the three-product lab
-(`lab-three-downstream`). It prints each policy's share of the bound per kind of day, so no kind of day gets
-worse unnoticed. Short-notice days join it with milestone 5.
+### 4. One score for all kinds of days (done, experiments [16](experiments/16-busy-days-longer-training.md) and [17](experiments/17-replanning-yardsticks.md))
 
-### 5. Reacting to the unexpected
+`uv run python -m sjfactory bench [models ...]` runs `check` on 30 days each of light-to-busy (`lab-mixed`),
+busy (`lab-busy`) and three-product (`lab-three-downstream`) days, with keep, the oracle and both re-planned
+oracles, and prints each policy's share of the bound per kind of day. It takes about 15 minutes.
 
-Today orders are known 10 to 30 times the time it takes to make them, so knowing every order in advance is
-worth almost nothing, and the oracle is a fair yardstick. Real factories get rush orders and breakdowns, and
-that is where a trained model should beat any planner that plans once.
-- Shorter notice: `lab-short.yaml` (`lab-mixed` with notice 120 to 600 s). Without training: keep -17%,
-  oracle 84% of the bound, which it reaches only because it knows the orders before they are announced.
-  Also try showing 30 orders instead of 20.
+### 5. Reacting to the unexpected (next)
+
+Knowing orders in advance is worth 5 to 8 points on busy days even with today's long notice (experiment 17).
+With short notice, planning ahead matters less and reacting more; that is where a trained model should pull
+ahead of planners.
+- Shorter notice: `lab-short.yaml` (`lab-mixed` with notice 120 to 600 s). Without training: keep -17%, the
+  oracle 84% of the bound (it knows the orders before they are announced). Train a model on it, add it to
+  `bench`, and compare with the fair planner.
+- Show 30 orders instead of 20 if short notice makes many orders visible at once.
 - Machine breakdowns (a new scenario setting whose default is none).
-- A fair yardstick for this: the look-ahead planner or the oracle re-planned each minute from the orders known
-  so far.
+
+### 6. Guess the future better
+
+On today's lab days the model is 3 points below the planner that knows every order. What it can still gain
+is in predicting orders not yet announced. Ideas, only after milestone 5: show the model how much of the
+day's usual demand is still to come; train on a wider range of days.
 
 ## Parked
 
@@ -99,3 +118,5 @@ Not on the path to the target; pick up only if a milestone needs them.
 
 - Experiments 1 to 14 ([experiments](experiments/README.md)): a model that matches or beats the oracle on
   normal days in a 4-minute training run.
+- Milestones 1 to 4 (experiments 15 to 17): an honest yardstick, the busy-day gap closed, `bench`, and fair
+  re-planning yardsticks.

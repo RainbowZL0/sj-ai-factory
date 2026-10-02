@@ -20,15 +20,15 @@ Reinforcement learning (RL) means a program learns by trial and error, guided by
 
 This project is still in development. Results so far, on the small lab factory (`scenarios/lab.yaml` and its variants):
 
-| Policy | Light to busy days | Busy days |
-|---|---|---|
-| **Trained model** (2M decisions on busy days, about 20 minutes) | **88%** | **87%** |
-| Planner that re-plans every 5 minutes from the orders announced so far | 86% | 82% |
-| Oracle: plans once, knowing every order in advance | 87% | 85% |
-| Planner that re-plans every 5 minutes, knowing every order in advance | 91% | 90% |
-| Keep: every machine stays on its starting recipe | -22% | -31% |
+| Policy | Light to busy days | Busy days | Short notice | Breakdowns |
+|---|---|---|---|---|
+| **Trained model** (2M decisions, about 15 minutes, trained on that kind of day or on busy days) | **88%** | **87%** | **83%** | **74%** |
+| Planner that re-plans every 5 minutes from the orders announced so far | 86% | 82% | 61% | 71% |
+| Oracle: plans once, knowing every order in advance | 87% | 85% | 85% | 70% |
+| Planner that re-plans every 5 minutes, knowing every order in advance | 91% | 90% | 87% | 70% |
+| Keep: every machine stays on its starting recipe | -22% | -31% | -26% | -43% |
 
-Numbers are shares of the upper bound, a profit no schedule can beat, over 30 days each (`uv run python -m sjfactory bench`). The model beats every planner that knows only what it knows; only a planner that sees the future does better. The [roadmap](docs/roadmap.md) says what we aim for and what comes next.
+Numbers are shares of the upper bound, a profit no schedule can beat, over 30 days each (`uv run python -m sjfactory bench`). The model beats every planner that knows only what it knows; only a planner that sees the future does better, and not when machines break down. The [roadmap](docs/roadmap.md) says what we aim for and what comes next.
 
 ## How it works
 

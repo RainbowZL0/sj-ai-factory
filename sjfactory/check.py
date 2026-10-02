@@ -63,14 +63,15 @@ def bound(env: FactoryEnv, whole_orders: bool | None = None) -> float:
     nx, no = T * R, len(orders)
     xi = lambda t, r: t * R + r  # machine-seconds on recipe r in period t
 
+    lost = _breakdown_seconds(sim, cats, T)
     rows, cols, vals, rhs = [], [], [], []
     row = 0
-    for t in range(T):  # machine time
-        for c in cats:
+    for t in range(T):  # machine time, less the time machines are broken down
+        for ci, c in enumerate(cats):
             for r in range(R):
                 if sc.recipes[r].category == c:
                     rows.append(row); cols.append(xi(t, r)); vals.append(1.0)
-            rhs.append(n_cat[c] * period_len[t]); row += 1
+            rhs.append(n_cat[c] * period_len[t] - lost[t, ci]); row += 1
     init = np.array([m.initial_stock for m in sc.materials])
     o_period = [min(T - 1, (o.due_time - 1) // L) for o in orders]  # ships at the end of its due second
     o_mat = [sc.material_index[o.product] for o in orders]
@@ -119,6 +120,21 @@ def bound(env: FactoryEnv, whole_orders: bool | None = None) -> float:
     best = -res.mip_dual_bound if np.isfinite(getattr(res, "mip_dual_bound", np.nan)) else -res.fun
     fines = sum(sim.order_fine[m] for m in o_mat)
     return best - _all_penalties(env) - fines - sc.rent_per_second * sc.horizon
+
+
+def _breakdown_seconds(sim, cats: list[str], T: int) -> np.ndarray:
+    """[period, kind]: machine seconds lost to the breakdowns still to come, from the state just reset"""
+    sc = sim.scenario
+    down = np.zeros((len(sc.machines), sc.horizon), dtype=bool)
+    end = np.zeros(len(sc.machines), dtype=int)
+    for at, m, seconds in sim.state.failures:  # sorted by time; a breakdown while broken makes it last longer
+        end[m] = max(end[m], at + seconds)
+        down[m, at:min(end[m], sc.horizon)] = True
+    lost = np.zeros((T, len(cats)))
+    for m, machine in enumerate(sc.machines):
+        per = np.add.reduceat(down[m], np.arange(0, sc.horizon, L))[:T] if down[m].any() else 0
+        lost[:, cats.index(machine.category)] += per
+    return lost
 
 
 def _energy_cost(sim, T: int) -> np.ndarray:

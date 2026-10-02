@@ -14,6 +14,8 @@ The plan for what comes next is in the [roadmap](../roadmap.md).
 
 **Since experiment 17** (`bench`, 30 days per kind of day, share of the upper bound): the best models get 88% on light-to-busy days, 87% on busy days and 86% on three-product days. That beats the oracle (87%, 85%, 69%) and a planner that re-plans every 5 minutes from the orders announced so far (86%, 82%, 59%). Only a planner that also knows the orders still to come does better on two products (91%, 90%). The busy-day gap of experiment 14 came mostly from testing on too few days and training too briefly ([16](16-busy-days-longer-training.md)). Judge models on 30 days or more, and look at the final model as well as the "best" one.
 
+**Since experiment 18** `bench` also has short-notice and breakdown days, where reacting matters more than planning ahead ([18](18-short-notice-and-breakdowns.md)). With short notice the fair planner drops to 61% while the busy-day model keeps 82% (83% when trained on short notice). With breakdowns the model gets 74% and every planner 70-71%, even the one that knows every order. The upper bound now takes off the machine time lost to breakdowns.
+
 What earlier lab experiments settled (numbers under the old rules, where part of an order was paid):
 - Serving machines further down the line first only matters when a material feeds recipes at different depths ([11](11-lab-variants.md), [12](12-mixed-demand-and-three-products.md)). There, machine order starves the line and the oracle fails (53%), while the model works around it (93%).
 - Spare time before the bottleneck lifts the oracle to 100% of the bound; storage costs hurt keep but not a model ([11](11-lab-variants.md)).
@@ -40,7 +42,7 @@ The files are now in `scenarios/large/`. Two trained models, both with the move 
 
 ## Next steps
 
-See the [roadmap](../roadmap.md). The first step is a whole-order upper bound, so the busy-day gap is measured against an honest ceiling.
+See the [roadmap](../roadmap.md). Milestone 5 is done; next is milestone 6, guessing future orders better, and one model for every kind of day (busy, short notice and breakdowns together).
 ## Experiments
 
 | # | Page | Change | Result |
@@ -62,6 +64,7 @@ See the [roadmap](../roadmap.md). The first step is a whole-order upper bound, s
 | 15 | [15-whole-order-bound-and-machine-time.md](15-whole-order-bound-and-machine-time.md) | Whole-order bound; where machine time goes; declining orders | Bound moves 0.2% at most, so the gap is real; the model loses by making products that never ship (10% of machine time, oracle 6%) |
 | 16 | [16-busy-days-longer-training.md](16-busy-days-longer-training.md) | 2M steps on busy days; order slack; 30 test days | Longer training closes the gap (87% against the oracle's 85% on 30 days); 10 days are too few; order slack adds nothing |
 | 17 | [17-replanning-yardsticks.md](17-replanning-yardsticks.md) | Oracle re-planned every 5 minutes, with all orders or only announced ones | Model beats the fair planner by 2-5 points and is 3 below the one that sees the future; knowing orders ahead is worth 5-8 points |
+| 18 | [18-short-notice-and-breakdowns.md](18-short-notice-and-breakdowns.md) | Short notice (`lab-short`); machine breakdowns as a setting (`lab-breakdowns`); bound counts breakdowns | Short notice: model 83%, fair planner 61%. Breakdowns: model 74%, every planner 70-71% |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

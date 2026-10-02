@@ -445,6 +445,20 @@ def test_breakdowns_do_not_change_the_orders():
     assert a.state.orders == b.state.orders and a.state.failures == [] and len(b.state.failures) > 0
 
 
+def test_bound_counts_breakdowns_and_stays_above_keep():
+    from sjfactory.check import bound
+    from sjfactory.evaluate import run_episode
+
+    broken = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml", ticks_per_action=60)
+    lab = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml", ticks_per_action=60)
+    for env in (broken, lab):
+        env.reset(seed=2000)
+    lower = bound(broken)
+    assert lower < bound(lab)  # same orders, less machine time
+    keep = run_episode(broken, KeepPolicy(broken.action_space), seed=2000).summary()["profit"]
+    assert keep <= lower
+
+
 def test_machine_time_split_adds_up():
     from sjfactory.check import time_split
     from sjfactory.evaluate import run_episode

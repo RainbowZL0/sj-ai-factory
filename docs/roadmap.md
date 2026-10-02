@@ -28,16 +28,17 @@ oracle, and as close as possible to the planner that knows every order.
 
 `bench`, share of the upper bound, 30 days per kind of day:
 
-| Policy | Light to busy | Busy | Third product |
-|---|---|---|---|
-| Best model | 88% | 87% | 86% |
-| Re-planned, every order known | 91% | 90% | 63% |
-| Re-planned, announced orders only (fair) | 86% | 82% | 59% |
-| Oracle, planned once | 87% | 85% | 69% |
+| Policy | Light to busy | Busy | Third product | Short notice | Breakdowns |
+|---|---|---|---|---|---|
+| Best model | 88% | 87% | 86% | 83% | 74% |
+| Re-planned, every order known | 91% | 90% | 63% | 87% | 70% |
+| Re-planned, announced orders only (fair) | 86% | 82% | 59% | 61% | 71% |
+| Oracle, planned once | 87% | 85% | 69% | 85% | 70% |
 
-The goal is met on the days the lab has today. The model beats the fair planner by 2 to 5 points and is 3 points
-below the planner that sees the future, so on these days the remaining gain lies in guessing future orders.
-Next: days where reacting matters more (milestone 5).
+The goal is met on every kind of day. The model beats the fair planner on all of them, by 22 points with short
+notice, and beats even the planner that sees the future when machines break down. The best model differs by kind
+of day (busy-day models for two products, a three-product model, a breakdown model). Next: guess future orders
+better, and one model for all two-product days (milestone 6).
 
 ## Why busy days came first
 
@@ -87,22 +88,22 @@ Also learned: the "best" model, picked on 3 test seeds, is often worse on new da
 busy (`lab-busy`) and three-product (`lab-three-downstream`) days, with keep, the oracle and both re-planned
 oracles, and prints each policy's share of the bound per kind of day. It takes about 15 minutes.
 
-### 5. Reacting to the unexpected (next)
+### 5. Reacting to the unexpected (done, [experiment 18](experiments/18-short-notice-and-breakdowns.md))
 
-Knowing orders in advance is worth 5 to 8 points on busy days even with today's long notice (experiment 17).
-With short notice, planning ahead matters less and reacting more; that is where a trained model should pull
-ahead of planners.
-- Shorter notice: `lab-short.yaml` (`lab-mixed` with notice 120 to 600 s). Without training: keep -17%, the
-  oracle 84% of the bound (it knows the orders before they are announced). Train a model on it, add it to
-  `bench`, and compare with the fair planner.
-- Show 30 orders instead of 20 if short notice makes many orders visible at once.
-- Machine breakdowns (a new scenario setting whose default is none).
+- Short notice (`lab-short.yaml`, orders known 120 to 600 s ahead): the fair planner drops to 61%, the
+  busy-day model keeps 82%, a model trained on short notice 83%.
+- Machine breakdowns (`breakdowns` setting, `lab-breakdowns.yaml`): a model trained on them gets 74%, every
+  planner 70-71%. The upper bound now takes off the machine time lost to breakdowns.
+- Showing 30 orders instead of 20 was not needed: with short notice fewer orders are visible, not more.
 
-### 6. Guess the future better
+### 6. Guess the future better, with one model (next)
 
-On today's lab days the model is 3 points below the planner that knows every order. What it can still gain
-is in predicting orders not yet announced. Ideas, only after milestone 5: show the model how much of the
-day's usual demand is still to come; train on a wider range of days.
+On long-notice days the model is 3 points below the planner that knows every order; what is left there is in
+predicting orders not yet announced. And today each kind of day has its own best model. Steps:
+1. One model for all two-product days: train on a mix of light-to-busy, busy, short-notice and breakdown days
+   (the breakdown feature is then always shown), and check with `bench` that it loses nothing against the
+   models trained on one kind of day.
+2. Show the model how much of the day's usual demand is still to come.
 
 ## Parked
 
@@ -120,3 +121,4 @@ Not on the path to the target; pick up only if a milestone needs them.
   normal days in a 4-minute training run.
 - Milestones 1 to 4 (experiments 15 to 17): an honest yardstick, the busy-day gap closed, `bench`, and fair
   re-planning yardsticks.
+- Milestone 5 (experiment 18): short notice and machine breakdowns, both in `bench`.

@@ -53,7 +53,7 @@ def model_episodes(env: FactoryEnv, model, seeds: Iterable[int], mode: str) -> l
     return recs
 
 
-MODEL_ENV_OPTIONS = ("order_slack",)  # env settings that change what a model sees, saved in its run's config.json
+MODEL_ENV_OPTIONS = ("order_slack", "show_breakdowns")  # env settings that change what a model sees, saved in its run's config.json
 
 
 def model_env_options(model_path) -> dict:

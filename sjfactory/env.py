@@ -64,6 +64,7 @@ class FactoryEnv(gym.Env):
         reward_scale: float = 0.01,
         move_cost: float = 0.0,
         order_slack: bool = False,
+        show_breakdowns: bool = False,
     ):
         """
         :param horizon: overrides the scenario's seconds per episode
@@ -74,6 +75,8 @@ class FactoryEnv(gym.Env):
         :param order_slack: also show, for each visible order, the time to spare once it and the earlier orders
             that still fit are made (see order_slack()). Changes the observation, so models trained with and
             without it can't be swapped.
+        :param show_breakdowns: show each machine's repair time left even if the scenario has no breakdowns
+            (always 0 then), so one model can play days with and without them
         """
         if not isinstance(scenario, Scenario):
             scenario = load_scenario(scenario)
@@ -86,6 +89,7 @@ class FactoryEnv(gym.Env):
         self.reward_scale = reward_scale
         self.move_cost = move_cost
         self.order_slack = order_slack
+        self.show_breakdowns = show_breakdowns or scenario.breakdowns is not None
 
         sc = scenario
         kinds, start = [], 0
@@ -118,7 +122,7 @@ class FactoryEnv(gym.Env):
             + 2 * len(sc.materials)  # stock: log scale, and in batches
             + 2 * len(self.slot_recipe)  # per slot: machines on that recipe now, and planned
             + self.sim.n_machines * (n_rcp + 4)  # recipe (including stop), batch left, changeover left, waiting for inputs
-            + self.sim.n_machines * (sc.breakdowns is not None)  # repair time left, only if machines can break down
+            + self.sim.n_machines * self.show_breakdowns  # repair time left, only if machines can break down
             + len(sc.products)  # units still ordered per product, over all known orders
             + visible_orders * (len(sc.products) + 2 + order_slack)  # product, quantity, time until due, [slack]
         )
@@ -235,7 +239,7 @@ class FactoryEnv(gym.Env):
                 now / self.slot_size,
                 planned / self.slot_size,
                 np.column_stack([recipe_onehot, progress, setup, waiting]).ravel(),
-                s.down / sc.breakdowns.duration_range[1] if sc.breakdowns else np.zeros(0),
+                s.down / (sc.breakdowns.duration_range[1] if sc.breakdowns else 1) if self.show_breakdowns else np.zeros(0),
                 _squash(demand),
                 orders.ravel(),
             ]

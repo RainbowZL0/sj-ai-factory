@@ -37,8 +37,8 @@ oracle, and as close as possible to the planner that knows every order.
 
 The goal is met on every kind of day. The model beats the fair planner on all of them, by 22 points with short
 notice, and beats even the planner that sees the future when machines break down. The best model differs by kind
-of day (busy-day models for two products, a three-product model, a breakdown model). Next: guess future orders
-better, and one model for all two-product days (milestone 6).
+of day; since experiment 19 one model covers all two-product days within 1 to 2 points of them. Next: guess
+future orders better (milestone 6).
 
 ## Why busy days came first
 
@@ -100,9 +100,10 @@ oracles, and prints each policy's share of the bound per kind of day. It takes a
 
 On long-notice days the model is 3 points below the planner that knows every order; what is left there is in
 predicting orders not yet announced. And today each kind of day has its own best model. Steps:
-1. One model for all two-product days: train on a mix of light-to-busy, busy, short-notice and breakdown days
-   (the breakdown feature is then always shown), and check with `bench` that it loses nothing against the
-   models trained on one kind of day.
+1. One model for all two-product days (done, [experiment 19](experiments/19-one-model-for-all-days.md)):
+   `train --mix` over light-to-busy, busy, short-notice and breakdown days, 4M steps. It is 1 to 2 points
+   behind the models trained on one kind of day, 2 ahead on breakdown days, and matches or beats the fair
+   planner everywhere. Next try: train the mix longer (each kind got 1M steps, the specialists 2M).
 2. Show the model how much of the day's usual demand is still to come.
 
 ## Parked

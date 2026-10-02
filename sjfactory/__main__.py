@@ -22,7 +22,7 @@ from sjfactory.evaluate import (
     BASELINES, MODEL_MODES, baseline_policy, cash_curve, evaluate, model_env_options, model_episodes, run_episode,
 )
 from sjfactory.recorder import Recorder
-from sjfactory.spec import DEFAULT_SCENARIO, PROJECT_ROOT
+from sjfactory.spec import DEFAULT_SCENARIO, PROJECT_ROOT, load_scenario
 
 RUNS_DIR = PROJECT_ROOT / "runs"
 
@@ -57,11 +57,23 @@ def finish(rec: Recorder, out: Path, policy: str, args) -> Path:
     return report
 
 
-def make_env(args) -> FactoryEnv:
+def make_env(args, scenario=None) -> FactoryEnv:
     return FactoryEnv(
-        args.scenario, horizon=args.horizon, ticks_per_action=args.ticks, move_cost=getattr(args, "move_cost", 0.0),
-        order_slack=getattr(args, "order_slack", False),
+        scenario or args.scenario, horizon=args.horizon, ticks_per_action=args.ticks,
+        move_cost=getattr(args, "move_cost", 0.0), order_slack=getattr(args, "order_slack", False),
+        show_breakdowns=getattr(args, "show_breakdowns", False),
     )
+
+
+def _mixed_env(args, scenario: str, rank: int):
+    """Builds one training environment on its own scenario, seeded like make_vec_env does"""
+    def init():
+        from stable_baselines3.common.monitor import Monitor
+
+        env = Monitor(make_env(args, scenario))
+        env.action_space.seed(args.seed + rank)
+        return env
+    return init
 
 
 def base_config(args, kind: str, env: FactoryEnv) -> dict:
@@ -97,6 +109,9 @@ def cmd_train(args):
     from sjfactory.training import TrainingMonitor
 
     out = new_run_dir("train")
+    mix = [args.scenario, *args.mix]
+    # One model for days with and without breakdowns must always see the repair-time numbers
+    args.show_breakdowns = len(mix) > 1 and any(load_scenario(s).breakdowns is not None for s in mix)
     eval_env = make_env(args)
     seeds = list(range(args.test_seed, args.test_seed + args.tests))
     web.write_config(
@@ -110,6 +125,8 @@ def cmd_train(args):
         keep_bias=args.keep_bias,
         move_cost=args.move_cost,
         order_slack=args.order_slack,
+        show_breakdowns=args.show_breakdowns,
+        mix=mix if len(mix) > 1 else None,
         test_seeds=seeds,
     )
 
@@ -132,10 +149,12 @@ def cmd_train(args):
     # The model is small, so extra PyTorch threads mostly wait on each other; the cores are better spent simulating
     torch.set_num_threads(args.torch_threads)
     # Each environment runs in its own process, so the simulations run at the same time on separate cores
-    vec_env = make_vec_env(
-        lambda: make_env(args), n_envs=args.envs, seed=args.seed,
-        vec_env_cls=SubprocVecEnv if args.envs > 1 else DummyVecEnv,
-    )
+    vec_env_cls = SubprocVecEnv if args.envs > 1 else DummyVecEnv
+    if len(mix) == 1:
+        vec_env = make_vec_env(lambda: make_env(args), n_envs=args.envs, seed=args.seed, vec_env_cls=vec_env_cls)
+    else:  # environment i trains on scenario i of the mix, taking turns
+        vec_env = vec_env_cls([_mixed_env(args, mix[i % len(mix)], i) for i in range(args.envs)])
+        vec_env.seed(args.seed)
     # Rewards are rescaled by a running estimate of their spread, so the reward predictions stay in a steady range.
     # Observations are already scaled by the environment and are left alone, so a saved model needs no extra files.
     vec_env = VecNormalize(vec_env, norm_obs=False, norm_reward=True, gamma=args.gamma)
@@ -181,7 +200,9 @@ def cmd_eval(args):
     from sb3_contrib import MaskablePPO
 
     model = MaskablePPO.load(args.model)
-    args.order_slack = model_env_options(args.model).get("order_slack", False)
+    options = model_env_options(args.model)
+    args.order_slack = options.get("order_slack", False)
+    args.show_breakdowns = options.get("show_breakdowns", False)
     env = make_env(args)
     out = new_run_dir("eval")
     web.write_config(out, **base_config(args, "eval", env), model=str(args.model), mode=args.mode)
@@ -247,6 +268,10 @@ def main():
     t.add_argument(
         "--order-slack", action="store_true",
         help="also show the model, per order, the time to spare once it and the earlier orders that fit are made",
+    )
+    t.add_argument(
+        "--mix", nargs="+", default=[], metavar="SCENARIO",
+        help="also train on these scenarios, each training process on one of them in turn; tests use --scenario",
     )
     t.add_argument("--tests", type=int, default=3, help="test episodes (seeds) per check")
     t.add_argument("--test-seed", type=int, default=1000, help="first test seed; tests use fixed orders")

@@ -65,6 +65,7 @@ All docs start at [docs/README.md](docs/README.md): the [roadmap](docs/roadmap.m
 uv run python -m sjfactory run --policy keep         # every machine keeps its starting recipe
 uv run python -m sjfactory run --policy random
 uv run python -m sjfactory --note "what I changed" train --steps 1000000   # MaskablePPO; steps = decisions, one per 60 s
+uv run python -m sjfactory --scenario scenarios/lab-busy.yaml train --mix scenarios/lab-short.yaml   # train on several kinds of day at once
 uv run python -m sjfactory eval runs/<folder>/best_model.zip --mode sampled   # or --mode fixed
 uv run python -m sjfactory view                      # list of all runs in the browser
 uv run python -m sjfactory check                     # machine load, keep, oracle and upper bound in under a minute, no training

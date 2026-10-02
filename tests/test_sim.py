@@ -459,6 +459,16 @@ def test_bound_counts_breakdowns_and_stays_above_keep():
     assert keep <= lower
 
 
+def test_show_breakdowns_lets_one_model_play_days_with_and_without_them():
+    lab = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml", ticks_per_action=60, show_breakdowns=True)
+    broken = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml", ticks_per_action=60)
+    plain = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml", ticks_per_action=60)
+    assert lab.observation_space.shape == broken.observation_space.shape
+    assert lab.observation_space.shape[0] == plain.observation_space.shape[0] + lab.sim.n_machines
+    obs, _ = lab.reset(seed=0)
+    assert obs.shape == lab.observation_space.shape
+
+
 def test_machine_time_split_adds_up():
     from sjfactory.check import time_split
     from sjfactory.evaluate import run_episode

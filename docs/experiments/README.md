@@ -16,6 +16,8 @@ The plan for what comes next is in the [roadmap](../roadmap.md).
 
 **Since experiment 18** `bench` also has short-notice and breakdown days, where reacting matters more than planning ahead ([18](18-short-notice-and-breakdowns.md)). With short notice the fair planner drops to 61% while the busy-day model keeps 82% (83% when trained on short notice). With breakdowns the model gets 74% and every planner 70-71%, even the one that knows every order. The upper bound now takes off the machine time lost to breakdowns.
 
+**Since experiment 19** one model (`runs/1003_024435-train/best_model.zip`, `train --mix`) plays every two-product kind of day: 86% light to busy, 84% busy, 82% short notice, 76% breakdowns, 1 to 2 points behind the models trained on one kind of day and ahead of them on breakdowns ([19](19-one-model-for-all-days.md)).
+
 What earlier lab experiments settled (numbers under the old rules, where part of an order was paid):
 - Serving machines further down the line first only matters when a material feeds recipes at different depths ([11](11-lab-variants.md), [12](12-mixed-demand-and-three-products.md)). There, machine order starves the line and the oracle fails (53%), while the model works around it (93%).
 - Spare time before the bottleneck lifts the oracle to 100% of the bound; storage costs hurt keep but not a model ([11](11-lab-variants.md)).
@@ -42,7 +44,7 @@ The files are now in `scenarios/large/`. Two trained models, both with the move 
 
 ## Next steps
 
-See the [roadmap](../roadmap.md). Milestone 5 is done; next is milestone 6, guessing future orders better, and one model for every kind of day (busy, short notice and breakdowns together).
+See the [roadmap](../roadmap.md). Milestone 5 is done and one model now covers every two-product kind of day (milestone 6, step 1). Next: train the mix longer to close the last 1 to 2 points, then show the model how much of the day's usual demand is still to come.
 ## Experiments
 
 | # | Page | Change | Result |
@@ -65,6 +67,7 @@ See the [roadmap](../roadmap.md). Milestone 5 is done; next is milestone 6, gues
 | 16 | [16-busy-days-longer-training.md](16-busy-days-longer-training.md) | 2M steps on busy days; order slack; 30 test days | Longer training closes the gap (87% against the oracle's 85% on 30 days); 10 days are too few; order slack adds nothing |
 | 17 | [17-replanning-yardsticks.md](17-replanning-yardsticks.md) | Oracle re-planned every 5 minutes, with all orders or only announced ones | Model beats the fair planner by 2-5 points and is 3 below the one that sees the future; knowing orders ahead is worth 5-8 points |
 | 18 | [18-short-notice-and-breakdowns.md](18-short-notice-and-breakdowns.md) | Short notice (`lab-short`); machine breakdowns as a setting (`lab-breakdowns`); bound counts breakdowns | Short notice: model 83%, fair planner 61%. Breakdowns: model 74%, every planner 70-71% |
+| 19 | [19-one-model-for-all-days.md](19-one-model-for-all-days.md) | One model trained on a mix of light-to-busy, busy, short-notice and breakdown days (`train --mix`) | Within 1-2 points of the specialists, 2 ahead on breakdowns (76%); matches or beats the fair planner everywhere |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

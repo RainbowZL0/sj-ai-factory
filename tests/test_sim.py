@@ -10,7 +10,7 @@ from sjfactory.policies import KeepPolicy, RandomPolicy
 from sjfactory.recorder import Recorder
 from sjfactory.spec import PROJECT_ROOT, scenario_from_dict
 
-FACTORY = PROJECT_ROOT / "scenarios" / "default.yaml"  # the large factory most tests were written for
+FACTORY = PROJECT_ROOT / "scenarios" / "large" / "default.yaml"  # the large factory most tests were written for
 
 # One machine that turns A into B; B can be sold
 TINY = {
@@ -102,7 +102,7 @@ def test_same_seed_same_orders():
 
 
 def test_varied_orders_follow_their_ranges():
-    sim = FactorySim(load_scenario(PROJECT_ROOT / "scenarios" / "varied.yaml"))
+    sim = FactorySim(load_scenario(PROJECT_ROOT / "scenarios" / "large" / "varied.yaml"))
     counts, single = set(), 0
     for seed in range(40):
         orders = sim.reset(seed=seed).orders
@@ -117,7 +117,7 @@ def test_varied_orders_follow_their_ranges():
 
 
 def test_orders_are_hidden_until_known():
-    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "varied.yaml", ticks_per_action=60)
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "large" / "varied.yaml", ticks_per_action=60)
     obs, _ = env.reset(seed=0)
     s = env.sim.state
     assert any(o.known_time > 0 for o in s.orders)
@@ -151,7 +151,7 @@ def test_recipes_that_can_never_run_get_no_slot():
 
 
 def test_casters_scenario_plans_casters_too():
-    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "casters.yaml", horizon=50)
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "large" / "casters.yaml", horizon=50)
     assert [k.category for k in env.kinds] == ["Caster", "Constructor", "Assembler"]
     assert env.action_space.nvec.tolist() == [1 + 3 * 2, 1 + 5 * 4, 1 + 5 * 4]
 

@@ -4,7 +4,7 @@
 
 For each machine kind (category), how many machines should run each of its recipes. An episode starts with the plan the machines start in, so a model that never changes it plays exactly like the keep rule.
 
-Recipes that can never run, because an input can never be obtained (`Scenario.obtainable`: starting stock plus anything made from it), are left out. In `default.yaml` there is no ore, so the casters are left out and never run; in `casters.yaml` they are planned like any other kind.
+Recipes that can never run, because an input can never be obtained (`Scenario.obtainable`: starting stock plus anything made from it), are left out. In `large/default.yaml` there is no ore, so the casters are left out and never run; in `large/casters.yaml` they are planned like any other kind.
 
 ## Action: one move per kind
 

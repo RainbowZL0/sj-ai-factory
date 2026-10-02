@@ -13,7 +13,7 @@
 
 All machines share one warehouse, so the scenario needs no links between machines. The real connections are the material flow chart (`material_flow.png`), drawn from the recipes.
 
-A change meant only to make this faster must give identical results: compare it second by second with the old code on several seeds, with random plans, and check that keep still makes 52,050 on seed 0.
+A change meant only to make this faster must give identical results: compare it second by second with the old code on several seeds, with random plans, and check that keep still makes 52,050 on seed 0 of `scenarios/large/default.yaml`.
 
 ## Variant files
 
@@ -38,16 +38,12 @@ A small factory built for quick experiments: round numbers, every load easy to c
 
 On seeds 2000 to 2009, keep makes -2.9k and the oracle 109k (88% of the upper bound, 123k).
 
-Variants (each a few lines on top of `lab.yaml`):
+Variants (each a few lines on top of `lab.yaml`), each with a role in the [roadmap](../roadmap.md):
 - `lab-busy.yaml`: 30 to 50 orders, about 410 units against a capacity of 360, so the plan also has to choose which orders to leave short.
-- `lab-storage.yaml`: storage costs on every part and product (0.01 to 0.05 per unit per second), so parts made too early cost profit.
-- `lab-bottleneck.yaml`: 4 smelters and 4 constructors, so only the assemblers are tight.
 - `lab-mixed.yaml`: 15 to 50 orders, from light days to more than the factory can make.
-- `lab-three-strict.yaml` and `lab-three-orderfine.yaml`: `lab-three-downstream.yaml` with penalties twice the price, or a fine of 3,000 per order not filled in full (material field `order_fine`).
 - `lab-three.yaml`: a third product, Pump (1 Gear + 1 Plate + 1 Wire; a constructor makes a Gear from 2 Plates), on 4 smelters, 4 constructors and 3 assemblers. Plates go both to assemblers and to gear making, and in machine order the gear maker takes every plate, so keep ships nothing. `lab-three-downstream.yaml` is the same with `input_priority: downstream`.
 
-`casters-downstream.yaml` is the larger casters factory with `input_priority: downstream`.
-
+Variants used only by experiments 11 and 13 (storage costs, a single tight kind, stricter penalties, order fines) were removed on 2026-10-03 and are in git history. The settings they used (`storage_cost`, `order_fine`) still work.
 ## Checking a scenario without training
 
 `uv run python -m sjfactory --scenario <file> check [models ...]` prints, in under a minute:
@@ -57,7 +53,11 @@ Variants (each a few lines on top of `lab.yaml`):
 
 Use it to see whether a change to the factory changes anything before spending a training run on it.
 
-## The default scenario (`scenarios/default.yaml`)
+## The large factory (`scenarios/large/`)
+
+The factory of experiments 1 to 9, now parked. `casters-downstream.yaml` is the casters factory with `input_priority: downstream`.
+
+### `default.yaml`
 
 - 5000 s per episode, 50 random orders for Motors and Frames, seeded at `reset()`.
 - 25 machines: 6 casters, 14 constructors, 5 assemblers.
@@ -67,11 +67,11 @@ Use it to see whether a change to the factory changes anything before spending a
 
 The large factory from the earlier experiments (1 to 9). Despite the file name, it is no longer the default; tests still use it.
 
-## The casters scenario (`scenarios/casters.yaml`)
+### `casters.yaml`
 
 The same factory with the smelting layer switched on: ore and coal start at 99,999 and ingots at 0, so the casters must make every ingot. With the starting recipes, casters and constructors are roughly in balance (3 iron casters make 1.5 iron ingots per second, which is what 6 bar constructors use), so moving constructors onto plates needs iron casters taken from steel. Keep makes 58,100 on the test seeds, about the same as in the default scenario.
 
-## The varied-orders scenario (`scenarios/varied.yaml`)
+### `varied.yaml` (varied orders)
 
 The casters factory, with orders whose shape changes every episode, so a model has to read the orders instead of learning one plan:
 - `count: [20, 100]` orders, `quantity: [1, 15]` units each.

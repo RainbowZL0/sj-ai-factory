@@ -180,12 +180,6 @@ class FactorySim:
         """
         s, sc = self.state, self.scenario
 
-        # 0. Machines due to break down stop now (a breakdown on a broken machine makes it last longer)
-        while s.failures and s.failures[0][0] <= s.clock:
-            _, m, seconds = s.failures.pop(0)
-            s.down[m] = max(s.down[m], seconds)
-        working = s.down == 0
-
         # 1. Switch recipes: only idle machines can switch. A different recipe needs a changeover first
         idle = self.idle
         for m, r in (changes or {}).items():
@@ -196,6 +190,13 @@ class FactorySim:
             if r != STOP and r != s.recipe[m]:
                 s.setup[m] = sc.changeover_time
             s.recipe[m] = r
+
+        # 1b. Machines due to break down stop now, after switching, so a switch asked for this second still
+        #     happens (a breakdown on a broken machine makes it last longer)
+        while s.failures and s.failures[0][0] <= s.clock:
+            _, m, seconds = s.failures.pop(0)
+            s.down[m] = max(s.down[m], seconds)
+        working = s.down == 0
 
         # 2. Idle machines with a recipe start if inputs are in stock. First come, first served, in machine order,
         #    or with input_priority "downstream" the machines furthest from the raw materials first

@@ -4,8 +4,8 @@
 
 `FactorySim.step(changes)` does these steps in this order:
 
-0. **Breakdowns.** Only with a `breakdowns` setting (`per_hour`, `duration: [low, high]` in seconds). Breakdown times are drawn at `reset()` from their own random stream, so the orders of a seed don't change. A broken machine does nothing until repaired: its batch and changeover pause, it uses no power, and it can't switch recipe. Without the setting nothing ever breaks, as before.
 1. **Switch recipes.** Only idle machines (no batch running, no changeover going on) can switch. Asking a busy machine to switch is an error, because it would mean the caller has a bug. Switching to a different recipe starts a changeover of `changeover_time` seconds, during which the machine makes nothing and uses no power. Stopping needs no changeover; starting again after a stop does.
+1b. **Breakdowns** (after switching, so a switch asked for this second still happens). Only with a `breakdowns` setting (`per_hour`, `duration: [low, high]` in seconds). Breakdown times are drawn at `reset()` from their own random stream, so the orders of a seed don't change. A broken machine does nothing until repaired: its batch and changeover pause, it uses no power, and it can't switch recipe. Without the setting nothing ever breaks, as before.
 2. **Start batches.** Every idle machine that has a recipe starts if the stock covers the inputs. Inputs are taken now. Machines are served in list order, or with `input_priority: downstream` the machines whose recipe is furthest from the raw materials first (`Scenario.recipe_depth`), then in list order.
 3. **Use power.** Running machines use `power_kw × 1 s` of energy.
 4. **Advance one second.** Changeovers count down. Batches that reach zero put their outputs into stock.

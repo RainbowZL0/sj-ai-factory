@@ -428,6 +428,14 @@ def test_a_broken_machine_pauses_its_batch_and_resumes():
     assert reports[4].deliveries[0].shipped == 1
 
 
+def test_plans_play_through_breakdowns():
+    from sjfactory.evaluate import run_episode
+
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml", ticks_per_action=60)
+    for seed in range(3):  # a switch asked for just before a machine breaks must not fail
+        assert run_episode(env, RandomPolicy(env.action_space, seed=seed), seed=seed).summary()["seconds"] == 3600
+
+
 def test_breakdowns_do_not_change_the_orders():
     lab = load_scenario(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml")
     broken = load_scenario(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml")

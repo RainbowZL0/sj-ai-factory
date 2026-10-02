@@ -12,6 +12,7 @@ MaskablePPO from sb3-contrib (PPO is a standard RL training method) with the def
 | `--envs` | 20 | environments simulated at once, one process each |
 | `--rollout` | 4096 | decisions collected across all environments per update |
 | `--torch-threads` | 1 | PyTorch threads; the model is small, so more threads only wait on each other |
+| `--move-cost` | 50 | taken off the reward for each machine moved in the plan; profit is not affected. Cut switches by 4 times on varied orders at no cost to profit ([experiment 8](../experiments/08-varied-orders.md)) |
 | `--keep-bias` | 0 | preference a fresh model gets for the starting plan; 0 learned fastest ([experiment 5](../experiments/05-keep-bias-sweep.md)) |
 | `--tests`, `--test-seed`, `--test-every` | 3, 1000, steps/20 | test episodes per check, first test seed, steps between checks |
 

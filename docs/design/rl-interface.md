@@ -1,16 +1,26 @@
 # RL interface (`env.py`)
 
-## Action: a plan
+## The plan
 
-One number per pair of machine kind (category) and recipe: how many machines of that kind should run that recipe, from 0 to the number of machines of that kind.
+For each machine kind (category), how many machines should run each of its recipes. An episode starts with the plan the machines start in, so a model that never changes it plays exactly like the keep rule.
 
-- The numbers of one kind are scaled to the machines there are, with leftovers going to the largest fractions (`allocate`), so every action is valid.
-- If all numbers of a kind are 0, that kind keeps its previous plan. A new episode starts with no plan, which means no machine switches: the keep rule.
-- Recipes that can never run, because an input can never be obtained (`Scenario.obtainable`: starting stock plus anything made from it), get no number. The casters (ore only) get none and are left alone.
-- `action_masks()` allows everything; it exists so MaskablePPO and the shared policy interface work.
-- `start_action()` is the plan that matches the starting recipes. Training can give a fresh model a preference for it (`--keep-bias`).
+Recipes that can never run, because an input can never be obtained (`Scenario.obtainable`: starting stock plus anything made from it), are left out. In `default.yaml` there is no ore, so the casters are left out and never run; in `casters.yaml` they are planned like any other kind.
 
-Why a plan and not one choice per machine: with one choice per machine, the model's most likely choice was either a bad plan (all constructors on the same recipe) or no change at all, and the useful behaviour lived only in random draws. See [experiment 1](../experiments/01-one-choice-per-machine.md) and [experiment 3](../experiments/03-plan-action.md).
+## Action: one move per kind
+
+One choice per machine kind, every decision:
+- 0: no change, or
+- move one machine of the plan from recipe A to recipe B (every ordered pair of two different recipes of that kind).
+
+So constructors (5 recipes) have 1 + 5 × 4 = 21 choices, assemblers 21, casters (3 recipes) 7.
+
+- Every choice gives a different plan. The earlier action (a number from 0 to 14 per recipe, scaled to the machines there are) gave the same plan for many different numbers, for example 1, 1, 1, 1, 1 and 2, 2, 2, 2, 2, so the model had to learn that those mean the same thing.
+- "No change" is a single choice, so keeping a good plan is easy to learn, and plans change by one machine at a time, so needless changeovers are less likely.
+- `action_masks()` blocks moves away from a recipe that has no planned machine.
+- `start_action()` is "no change" for every kind. Training can give a fresh model a preference for it (`--keep-bias`).
+- Machines that start stopped are not in the plan and stay stopped. No scenario has any.
+
+Why a plan and not one choice per machine: with one choice per machine, the model's most likely choice was either a bad plan (all constructors on the same recipe) or no change at all, and the useful behaviour lived only in random draws. See [experiment 1](../experiments/01-one-choice-per-machine.md) and [experiment 3](../experiments/03-plan-action.md). Why moves and not a full plan per decision: see [experiment 7](../experiments/07-move-action-and-casters.md).
 
 ## Carrying out the plan
 
@@ -23,7 +33,8 @@ One flat vector, all squeezed to small values:
 - stock, twice: on a log scale, and in "batches" (stock divided by the most any recipe uses per batch, capped at 10). The log scale alone hides the difference between 3 and 5 screws, which decides whether a machine can start.
 - per kind and recipe: machines on it now, and machines planned
 - per machine: its recipe (one‑hot, meaning a row of zeros with a single 1), the fraction of its batch left, the fraction of its changeover left, and whether it is waiting for inputs
-- the 20 nearest orders: product, quantity and time until due
+- units still ordered per product, over all known orders
+- the 20 known orders due soonest: product, quantity and time until due. Orders not yet known (see `notice` in [simulation.md](simulation.md)) are hidden.
 
 Prices and other constants are left out because they never change within a scenario; cash is left out because it does not change what the best decision is.
 
@@ -31,12 +42,12 @@ Changing the observation or the action means models saved before the change can'
 
 ## Reward and time
 
-- **Reward.** The cash change during the action, times `reward_scale` (0.01).
+- **Reward.** The cash change during the action, minus `move_cost` for each machine moved in the plan, times `reward_scale` (0.01). The move cost (`--move-cost`, 50 in training) discourages needless changeovers; it only lowers the reward, never cash or profit.
 - **Time.** `ticks_per_action` seconds pass per decision; the command line uses 60. A changeover alone takes 30 seconds, so plans don't need to change faster.
 - **Repeatable runs.** `reset(seed=...)` seeds the random orders, so the same seed gives the same episode.
 
 ## Fixed rules (`policies.py`)
 
 - `KeepPolicy`: never plans, so no machine ever switches.
-- `RandomPolicy`: with probability 0.1 per decision, a random plan; otherwise keeps the previous one.
+- `RandomPolicy`: with probability 0.1 per decision, a random allowed choice for each kind (a move, or sometimes no change); otherwise no change. Since the move action it drifts slowly away from keep instead of jumping to random plans, so its score is much closer to keep than before.
 - `ModelPolicy`: a trained model, either taking its most likely plan ("fixed") or drawing one from its probabilities ("sampled").

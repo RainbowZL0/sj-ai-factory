@@ -23,10 +23,22 @@ A change meant only to make this faster must give identical results: compare it 
 - Ore stock is 0, so the casters never run. Ingots start at 99,999, so they never run out.
 - Keep (every machine stays on its starting recipe) never runs PlateAssemble or FrameFinal, so it fills no Frame orders.
 
+## The casters scenario (`scenarios/casters.yaml`)
+
+The same factory with the smelting layer switched on: ore and coal start at 99,999 and ingots at 0, so the casters must make every ingot. With the starting recipes, casters and constructors are roughly in balance (3 iron casters make 1.5 iron ingots per second, which is what 6 bar constructors use), so moving constructors onto plates needs iron casters taken from steel. Keep makes 58,100 on the test seeds, about the same as in the default scenario.
+
+## The varied-orders scenario (`scenarios/varied.yaml`)
+
+The casters factory, with orders whose shape changes every episode, so a model has to read the orders instead of learning one plan:
+- `count: [20, 100]` orders, `quantity: [1, 15]` units each.
+- `mix: random`: each episode draws its own Motor/Frame mix; a quarter of episodes order one product only.
+- `notice: [900, 2400]`: each order becomes known 900 to 2400 s before it is due, and nothing is due before 900 s. In the other scenarios orders are due from second 0, but the first Frame takes about 550 s to make, so early orders could never be filled ([experiment 7](../experiments/07-move-action-and-casters.md)).
+
+These settings are optional in any scenario; without them orders are drawn exactly as before. Keep's profit swings widely from episode to episode here (-61k to 134k on the 3 test seeds), so training on it uses 10 test seeds.
+
 ## Not modelled yet
 
 - Buying raw materials.
-- Orders appearing during the episode. All orders are known at the start.
 - Machine breakdowns.
 
 Each would be a field in `spec.py` plus a few lines in `FactorySim.step`.

@@ -54,7 +54,9 @@ def finish(rec: Recorder, out: Path, policy: str, args) -> Path:
 
 
 def make_env(args) -> FactoryEnv:
-    return FactoryEnv(args.scenario, horizon=args.horizon, ticks_per_action=args.ticks)
+    return FactoryEnv(
+        args.scenario, horizon=args.horizon, ticks_per_action=args.ticks, move_cost=getattr(args, "move_cost", 0.0)
+    )
 
 
 def base_config(args, kind: str, env: FactoryEnv) -> dict:
@@ -101,6 +103,7 @@ def cmd_train(args):
         torch_threads=args.torch_threads,
         gamma=args.gamma,
         keep_bias=args.keep_bias,
+        move_cost=args.move_cost,
         test_seeds=seeds,
     )
 
@@ -140,14 +143,13 @@ def cmd_train(args):
         verbose=0,
         seed=args.seed,
     )
-    # Start close to the keep rule. A fresh model picks every number almost evenly, so it would reshuffle the
-    # machines at random, paying a changeover each time, and spend most of training just learning to keep.
-    # With the bias, each number of the starting plan is e^keep_bias times as likely as any other, so a fresh
-    # model's most likely plan is the starting one, which plays exactly like the keep rule.
+    # Optionally start close to the keep rule. A fresh model picks every choice almost evenly, so it moves
+    # machines often, paying a changeover each time. With the bias, "no change" is e^keep_bias times as likely
+    # as any single move, so a fresh model's most likely action is to keep the plan.
     with torch.no_grad():
         bias, start = model.policy.action_net.bias, 0
-        for size, count in zip(eval_env.action_space.nvec, eval_env.start_action()):
-            bias[start + count] += args.keep_bias
+        for size, choice in zip(eval_env.action_space.nvec, eval_env.start_action()):
+            bias[start + choice] += args.keep_bias
             start += size
     # progress.csv feeds the "learning health" charts; TensorBoard still works on the same folder
     model.set_logger(configure(str(out / "logs"), ["csv", "tensorboard"]))
@@ -212,6 +214,10 @@ def main():
     t.add_argument("--torch-threads", type=int, default=1, help="PyTorch threads for the model update")
     t.add_argument("--ticks", type=int, default=60, help="seconds simulated after each decision")
     t.add_argument("--gamma", type=float, default=0.97, help="0.97 looks about 33 decisions (33 minutes) ahead")
+    t.add_argument(
+        "--move-cost", type=float, default=50.0,
+        help="taken off the reward for each machine moved in the plan; profit is not affected",
+    )
     t.add_argument("--keep-bias", type=float, default=0.0, help="how strongly a fresh model prefers the starting plan (0: no preference)")
     t.add_argument("--tests", type=int, default=3, help="test episodes (seeds) per check")
     t.add_argument("--test-seed", type=int, default=1000, help="first test seed; tests use fixed orders")

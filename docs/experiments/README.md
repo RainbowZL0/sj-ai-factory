@@ -6,21 +6,26 @@ All profits are the mean over test seeds 1000, 1001 and 1002 (the same orders ev
 
 ## Where things stand (2026-10-02)
 
-| Policy | Test profit | Ordered units shipped |
-|---|---|---|
-| Trained model, plan action, 1M steps | about 116k to 121k | about 88% |
-| Keep (every machine stays on its starting recipe) | 58,900 | 39% |
-| Random plans | -68,300 | about 2% |
+Two trained models, both with the move action and a move cost of 50, on the casters factory:
 
-The model does just as well taking its most likely choice as when drawing at random. What the best model does (run `1002_163351-train`, seed 1000):
-- Assemblers: from the first minute, one machine on each of the 5 assembler recipes. Keep never makes reinforced plates or frames, so this is where most of the extra profit comes from: Frame orders get filled.
-- Constructors: roughly 6 to 7 on iron bars, 3 to 5 on screws, 1 to 2 on plates, the rest on tubes and wire. But it changes this plan almost every minute, and each change costs a 30 s changeover.
+| Orders (30 new seeds each) | Keep | Trained on the usual orders | Trained on varied orders |
+|---|---|---|---|
+| Usual shape | 82,560 | 126,590 | 116,680 |
+| More orders (100) | 117,360 | 115,110 | 140,290 |
+| Almost only Motor | 164,590 | 161,190 | 175,910 |
+| Tough: 100 large orders, known 900 to 2400 s ahead | -51,520 | -65,330 | -33,150 |
+
+- The action is one move per machine kind per minute ([experiment 7](07-move-action-and-casters.md)): the same level as the old plan action in less than half the steps. The casters are back and learned just as well.
+- A model trained on the usual orders plays one plan for that mix and loses to keep when the orders take another shape ([experiment 6](06-other-orders.md)). Trained on varied orders ([experiment 8](08-varied-orders.md)), it beats keep on every order shape tested, at a cost of about 10k on the usual shape.
+- Early orders used to be impossible (the first Frame takes about 550 s). Orders can now have a notice time, and nothing is due before it.
+- A move cost of 50 in the reward cut changeovers from 203 to 46 per episode on varied orders, without losing profit.
 
 ## Next steps
 
-1. Cut needless changeovers: decide less often (`--ticks 120` or `180`), or charge a small cost whenever the plan changes.
-2. Test on seeds never used for picking the best model, to check the profit holds on other orders.
-3. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
+1. Train the varied model longer (it was still improving at 1M steps), for example 3M steps, and make `scenarios/varied.yaml` the main training scenario.
+2. Give products a storage cost: making to stock is free now, which matters once orders arrive during the episode.
+3. Check how much of the tough case's loss any plan could avoid, for example with a rule that puts everything into Motors.
+4. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
 
 ## Experiments
 
@@ -31,6 +36,9 @@ The model does just as well taking its most likely choice as when drawing at ran
 | 3 | [03-plan-action.md](03-plan-action.md) | Action becomes a plan every 60 s | With randomness 74k and rising; without, still keep |
 | 4 | [04-speed-up.md](04-speed-up.md) | Parallel environments, 1 PyTorch thread, faster simulator | 132 to about 1,300 steps per second, same learning |
 | 5 | [05-keep-bias-sweep.md](05-keep-bias-sweep.md) | Keep bias 0 to 3, 1M steps | About 120k both ways; bias 0 fastest, now the default |
+| 6 | [06-other-orders.md](06-other-orders.md) | Best model on new seeds and differently shaped orders | Wins on all new seeds; loses to keep when demand exceeds capacity or most orders are Motors |
+| 7 | [07-move-action-and-casters.md](07-move-action-and-casters.md) | Action becomes one move per kind; casters back | Same 118k, reached in less than half the steps, half the changeovers; casters learned fine |
+| 8 | [08-varied-orders.md](08-varied-orders.md) | Notice times, varied orders per episode, move cost | Beats keep on every order shape; 10k less on the usual one; move cost cuts switches 4 times |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 
@@ -42,3 +50,7 @@ A new experiment page says: what changed and why, the run folder, the settings, 
 - **Don't leave impossible choices in.** Casters can never run, yet they kept choosing recipes. (2)
 - **A strong starting preference for keep freezes learning.** Keep bias 5 held the model exactly at keep for 200k steps; 0 learns fastest. (2, 3, 5)
 - **Training time is simulation time.** Parallel processes and 1 PyTorch thread gave about 9 times the speed. (4)
+- **Give each different decision exactly one action.** When many actions meant the same plan, learning took twice as long. (7)
+- **Test on orders of other shapes, not only other seeds.** A model can win on every new seed and still only know one plan. (6)
+- **Train on the variety you want handled.** Varied orders per episode taught the model to read the orders. (8)
+- **Check what is possible before blaming the model.** All the missed units were in orders no plan could fill in time. (8)

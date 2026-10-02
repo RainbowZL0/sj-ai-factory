@@ -16,7 +16,7 @@
   <img src="docs/images/profit.png" alt="Cash over time: trained model 118k, keep 56k, random plans -68k" width="860">
 </p>
 
-Reinforcement learning (RL) means a program learns by trial and error, guided by a reward score. Here the reward is money earned. Every minute the model chooses how many machines of each kind run each recipe, and the simulator plays out the next minute.
+Reinforcement learning (RL) means a program learns by trial and error, guided by a reward score. Here the reward is money earned. Every minute the model may move one machine of each kind to another recipe, and the simulator plays out the next minute.
 
 This project is still in development. These are the results so far, and they will change.
 
@@ -24,7 +24,7 @@ This project is still in development. These are the results so far, and they wil
 |---|---|---|
 | **Trained model** (1M decisions, about 13 minutes) | **about 120k** | **about 88%** |
 | Keep (every machine stays on its starting recipe) | 58.9k | 39% |
-| Random plans | -68.3k | about 2% |
+| Random plans (before the move action) | -68.3k | about 2% |
 
 Profit is the mean over three test episodes with fixed orders.
 
@@ -35,7 +35,7 @@ flowchart LR
     A["scenario YAML<br>materials, recipes,<br>machines, orders"] --> B["FactorySim<br>second-by-second rules"]
     B --> C["FactoryEnv<br>Gymnasium wrapper"]
     C -- "what the factory looks like" --> D["MaskablePPO model"]
-    D -- "plan: machines per recipe,<br>every 60 s" --> C
+    D -- "move one machine per kind,<br>every 60 s" --> C
     C -- "reward: cash earned" --> D
     B --> E["HTML pages and charts"]
 ```

@@ -47,15 +47,25 @@ class Order:
     product: str
     quantity: float
     due_time: int  # absolute time in seconds; ships whatever stock exists at that moment
+    known_time: int = 0  # when the order becomes known; before that the model can't see it
 
 
 @dataclass(frozen=True)
 class RandomOrders:
-    """Extra orders generated from the random seed at each reset"""
+    """Extra orders generated from the random seed at each reset.
 
-    count: int
+    Without count_range, mix or notice, orders are drawn exactly as they always were, so old results repeat.
+    """
+
+    count_range: tuple[int, int]  # number of orders, drawn per episode; both ends included
     products: tuple[str, ...]
-    quantity_range: tuple[int, int]  # both ends included
+    quantity_range: tuple[int, int]  # units per order; both ends included
+    # "even": every order picks a product with equal chance. "random": each episode draws its own mix:
+    # a quarter of episodes order only one product, the rest a random share of each.
+    mix: str = "even"
+    # Seconds between an order becoming known and its due time, drawn per order; both ends included.
+    # None: every order is known from the start. Nothing is due before the shortest notice.
+    notice_range: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -150,9 +160,19 @@ class Scenario:
             for p in self.random_orders.products:
                 if p not in materials:
                     raise ValueError(f"random order product {p} is not a known material")
-            lo, hi = self.random_orders.quantity_range
+            ro = self.random_orders
+            lo, hi = ro.quantity_range
             if not 0 <= lo <= hi:
                 raise ValueError("random order quantity range must satisfy 0 <= low <= high")
+            lo, hi = ro.count_range
+            if not 0 <= lo <= hi:
+                raise ValueError("random order count range must satisfy 0 <= low <= high")
+            if ro.mix not in ("even", "random"):
+                raise ValueError(f"random order mix must be even or random, not {ro.mix}")
+            if ro.notice_range is not None:
+                lo, hi = ro.notice_range
+                if not 0 <= lo <= hi or lo >= self.horizon:
+                    raise ValueError("random order notice range must satisfy 0 <= low <= high, low < horizon")
 
 
 def load_scenario(path: str | Path = DEFAULT_SCENARIO) -> Scenario:
@@ -189,14 +209,24 @@ def scenario_from_dict(d: dict[str, Any]) -> Scenario:
         orders=tuple(Order(**o) for o in orders.get("fixed") or []),
         random_orders=(
             RandomOrders(
-                count=int(rnd["count"]),
+                count_range=_int_range(rnd["count"]),
                 products=tuple(rnd["products"]),
-                quantity_range=tuple(rnd["quantity"]),
+                quantity_range=_int_range(rnd["quantity"]),
+                mix=rnd.get("mix", "even"),
+                notice_range=_int_range(rnd["notice"]) if "notice" in rnd else None,
             )
             if rnd
             else None
         ),
     )
+
+
+def _int_range(value) -> tuple[int, int]:
+    """A YAML number or [low, high] list as a (low, high) pair; a single number n means (n, n)"""
+    if isinstance(value, (list, tuple)):
+        lo, hi = value
+        return int(lo), int(hi)
+    return int(value), int(value)
 
 
 def _expand_machines(groups: list[dict]) -> tuple[Machine, ...]:

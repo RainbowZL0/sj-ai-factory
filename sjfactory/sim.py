@@ -110,15 +110,29 @@ class FactorySim:
         spec = self.scenario.random_orders
         if spec is None:
             return []
-        lo, hi = spec.quantity_range
-        return [
-            Order(
-                product=str(rng.choice(spec.products)),
-                quantity=int(rng.integers(lo, hi + 1)),
-                due_time=int(rng.integers(0, self.scenario.horizon)),
-            )
-            for _ in range(spec.count)
-        ]
+        # Draws for the optional settings only happen when they are set, so older scenarios get the same orders
+        lo, hi = spec.count_range
+        count = lo if lo == hi else int(rng.integers(lo, hi + 1))
+        products = sorted(set(spec.products), key=spec.products.index)
+        share = None  # None: every product in the list equally likely, as always
+        if spec.mix == "random":
+            if rng.random() < 0.25:
+                share = np.eye(len(products))[rng.integers(len(products))]
+            else:
+                share = rng.dirichlet(np.ones(len(products)))
+        first_due = spec.notice_range[0] if spec.notice_range else 0
+
+        orders = []
+        for _ in range(count):
+            product = str(rng.choice(spec.products)) if share is None else str(rng.choice(products, p=share))
+            quantity = int(rng.integers(spec.quantity_range[0], spec.quantity_range[1] + 1))
+            due = int(rng.integers(first_due, self.scenario.horizon))
+            known = 0
+            if spec.notice_range:
+                notice = int(rng.integers(spec.notice_range[0], spec.notice_range[1] + 1))
+                known = max(0, due - notice)
+            orders.append(Order(product=product, quantity=quantity, due_time=due, known_time=known))
+        return orders
 
     @property
     def idle(self) -> np.ndarray:

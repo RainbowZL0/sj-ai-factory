@@ -5,10 +5,10 @@ import pytest
 from gymnasium.utils.env_checker import check_env
 
 from sjfactory import STOP, FactoryEnv, FactorySim, load_scenario
-from sjfactory.env import NO_CHANGE, allocate
+from sjfactory.env import NO_CHANGE
 from sjfactory.policies import KeepPolicy, RandomPolicy
 from sjfactory.recorder import Recorder
-from sjfactory.spec import scenario_from_dict
+from sjfactory.spec import PROJECT_ROOT, scenario_from_dict
 
 # One machine that turns A into B; B can be sold
 TINY = {
@@ -99,14 +99,45 @@ def test_same_seed_same_orders():
     assert a.reset(seed=7).orders != a.reset(seed=8).orders
 
 
+def test_varied_orders_follow_their_ranges():
+    sim = FactorySim(load_scenario(PROJECT_ROOT / "scenarios" / "varied.yaml"))
+    counts, single = set(), 0
+    for seed in range(40):
+        orders = sim.reset(seed=seed).orders
+        counts.add(len(orders))
+        single += len({o.product for o in orders}) == 1
+        for o in orders:
+            assert 1 <= o.quantity <= 15
+            assert 900 <= o.due_time < 5000
+            assert 900 <= o.due_time - o.known_time <= 2400 or o.known_time == 0
+    assert min(counts) >= 20 and max(counts) <= 100 and len(counts) > 10
+    assert 3 <= single <= 20  # about a quarter of episodes order one product only
+
+
+def test_orders_are_hidden_until_known():
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "varied.yaml", ticks_per_action=60)
+    obs, _ = env.reset(seed=0)
+    s = env.sim.state
+    assert any(o.known_time > 0 for o in s.orders)
+    known = [o for o in s.orders if o.known_time == 0]
+    n_prod = len(env.sim.scenario.products)
+    orders = obs[-env.visible_orders * (n_prod + 2):].reshape(env.visible_orders, n_prod + 2)
+    shown = int((orders[:, :n_prod].sum(axis=1) > 0).sum())
+    assert shown == min(len(known), env.visible_orders)
+
+
+def test_move_cost_only_lowers_the_reward():
+    env = FactoryEnv(horizon=120, ticks_per_action=60, reward_scale=1.0, move_cost=100)
+    _, info = env.reset(seed=0)
+    constructors = env.kinds[0]
+    action = env.start_action()
+    action[0] = move(constructors, 0, 1)
+    _, reward, _, _, after = env.step(action)
+    assert reward == pytest.approx(after["cash"] - info["cash"] - 100)
+
+
 def test_env_passes_gymnasium_checks():
     check_env(FactoryEnv(horizon=50), skip_render_check=True)
-
-
-def test_allocate_splits_machines_in_proportion():
-    assert allocate(np.array([1, 1, 0]), 5).tolist() == [3, 2, 0]
-    assert allocate(np.array([6, 4, 2, 2, 0]), 14).tolist() == [6, 4, 2, 2, 0]
-    assert allocate(np.array([0, 0, 7]), 3).tolist() == [0, 0, 3]
 
 
 def test_recipes_that_can_never_run_get_no_slot():
@@ -114,34 +145,55 @@ def test_recipes_that_can_never_run_get_no_slot():
     sc = env.sim.scenario
     assert "IronOre" not in sc.obtainable and "Motor" in sc.obtainable
     assert [k.category for k in env.kinds] == ["Constructor", "Assembler"]  # every caster recipe needs ore
-    assert env.action_space.nvec.tolist() == [15] * 5 + [6] * 5
+    assert env.action_space.nvec.tolist() == [1 + 5 * 4, 1 + 5 * 4]  # no change, or a move between 2 of 5 recipes
+
+
+def test_casters_scenario_plans_casters_too():
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "casters.yaml", horizon=50)
+    assert [k.category for k in env.kinds] == ["Caster", "Constructor", "Assembler"]
+    assert env.action_space.nvec.tolist() == [1 + 3 * 2, 1 + 5 * 4, 1 + 5 * 4]
+
+
+def move(kind, a, b):
+    """The choice that moves one planned machine of kind from recipe a to recipe b (positions in kind.recipes)"""
+    return 1 + kind.moves.index((a, b))
+
+
+def test_moves_are_unique_and_masked():
+    env = FactoryEnv(horizon=50)
+    env.reset(seed=0)
+    for k in env.kinds:
+        assert len(set(k.moves)) == len(k.moves)
+    assemblers = env.kinds[1]
+    assert env.plan[1].tolist() == [2, 2, 0, 1, 0]  # the starting plan: what the machines start on
+    mask = env.action_masks()[env.action_space.nvec[0]:]
+    assert mask[0]  # no change is always allowed
+    assert not mask[move(assemblers, 2, 0)]  # nothing planned on PlateAssemble to move away
+    assert mask[move(assemblers, 0, 2)]
 
 
 def test_plan_switches_idle_machines_only_and_keeps_the_rest():
     env = FactoryEnv(horizon=400, ticks_per_action=1)
     env.reset(seed=0)
     start = env.start_action()
-    assert env.switches() == {}  # no plan yet
-    env.step(start)  # planning the starting allocation changes nothing
+    env.step(start)  # no change: nothing switches
     assert env.switches() == {}
-    assert env.start_action().tolist() == start.tolist()  # from the scenario, not from the current state
 
     sc = env.sim.scenario
     constructors = env.kinds[0]
     plate = constructors.recipes.index(sc.recipe_index["Ingot_2_Plate"])
     bar = constructors.recipes.index(sc.recipe_index["Ingot_2_Bar"])
     action = start.copy()
-    action[constructors.slots.start + plate] = 2
-    action[constructors.slots.start + bar] = 4
+    action[0] = move(constructors, bar, plate)
+    env.step(action)
+    env.step(action)  # two moves: 2 bar machines planned onto plates
+    assert env.plan[0][plate] == 2 and env.plan[0][bar] == 4
     for _ in range(60):
-        env.step(action)
+        env.step(start)
         for m in env.switches():
             assert env.sim.idle[m]
     assert env._current_counts(constructors).tolist() == env.plan[0].tolist()
-    assert env.plan[0][plate] == 2 and env.plan[0][bar] == 4
-
-    env.step(np.zeros_like(action))  # all zeros: keep the plan
-    assert env.plan[0][plate] == 2
+    assert env.plan[0].sum() == len(constructors.machines)  # moves keep the total
 
 
 def test_changeover_delays_the_new_recipe():

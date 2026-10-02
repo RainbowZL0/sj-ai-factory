@@ -26,7 +26,7 @@ class KeepPolicy:
 
 
 class RandomPolicy:
-    """With probability change_prob per decision, makes a random plan; otherwise keeps the previous one"""
+    """With probability change_prob per decision, a random allowed choice for each kind; otherwise no change"""
 
     def __init__(self, action_space: spaces.MultiDiscrete, change_prob=0.1, seed=None):
         self.nvec = action_space.nvec
@@ -35,7 +35,8 @@ class RandomPolicy:
 
     def act(self, obs, mask):
         if self.rng.random() < self.change_prob:
-            return self.rng.integers(0, self.nvec)
+            per_kind = np.split(np.asarray(mask), np.cumsum(self.nvec)[:-1])
+            return np.array([self.rng.choice(np.flatnonzero(m)) for m in per_kind])
         return np.full(len(self.nvec), NO_CHANGE)
 
 

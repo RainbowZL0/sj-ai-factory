@@ -3,7 +3,7 @@
 ## Rules
 
 - Commit messages and PR descriptions must not contain "Co-Authored-By: Claude" or any other AI attribution line.
-- Never commit generated files (`runs/`, charts, Excel, models); `.gitignore` covers them.
+- Never commit generated files (`runs/`, charts, Excel, models); `.gitignore` covers them. The one exception is the README pictures in `docs/images/`; redraw them with `scripts/readme_images.py` after a better run.
 - English for everything in the repo: code comments, docstrings, error messages, CLI output, docs, YAML comments and commit messages.
 - Docs are a tree of indexes starting at `docs/README.md`; every folder's `README.md` lists its pages. When adding a page, add it to its folder's index.
 - Keep `docs/design/` in sync when the rules in `FactorySim.step` or the RL interface in `env.py` change.

@@ -1,6 +1,58 @@
-# sj-ai-factory
+<h1 align="center">sj-ai-factory</h1>
 
-A factory production simulator, plus reinforcement learning (RL) that learns how many machines should run each recipe. RL means a program learns by trial and error, guided by a reward score. Here the reward is money earned.
+<p align="center">
+  A factory simulator where a reinforcement learning model decides which machine makes what.<br>
+  It learns to earn <b>twice the money</b> of the "change nothing" rule.
+</p>
+
+<p align="center">
+  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white">
+  <img alt="Built with uv" src="https://img.shields.io/badge/built%20with-uv-de5fe9">
+  <img alt="MaskablePPO" src="https://img.shields.io/badge/RL-MaskablePPO-2563eb">
+  <img alt="Gymnasium" src="https://img.shields.io/badge/env-Gymnasium-0081a5">
+</p>
+
+<p align="center">
+  <img src="docs/images/profit.png" alt="Cash over time: trained model 118k, keep 56k, random plans -68k" width="860">
+</p>
+
+Reinforcement learning (RL) means a program learns by trial and error, guided by a reward score. Here the reward is money earned. Every minute the model chooses how many machines of each kind run each recipe, and the simulator plays out the next minute.
+
+| Policy | Test profit | Ordered units shipped |
+|---|---|---|
+| **Trained model** (1M decisions, about 13 minutes) | **about 120k** | **about 88%** |
+| Keep (every machine stays on its starting recipe) | 58.9k | 39% |
+| Random plans | -68.3k | about 2% |
+
+Profit is the mean over three test episodes with fixed orders.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["scenario YAML<br>materials, recipes,<br>machines, orders"] --> B["FactorySim<br>second-by-second rules"]
+    B --> C["FactoryEnv<br>Gymnasium wrapper"]
+    C -- "what the factory looks like" --> D["MaskablePPO model"]
+    D -- "plan: machines per recipe,<br>every 60 s" --> C
+    C -- "reward: cash earned" --> D
+    B --> E["HTML pages and charts"]
+```
+
+The model starts out knowing nothing. After about 120k decisions it beats keep, and it levels off near 120k profit:
+
+<p align="center">
+  <img src="docs/images/learning.png" alt="Test profit while training: the model passes keep after about 120k decisions and settles near 120k profit" width="860">
+</p>
+
+The solid line is the model taking its most likely choices. The dashed line is it drawing choices at random, as it does in training. Both end in the same place, so the model really has a plan and is not relying on luck.
+
+This is what the plan looks like on the factory floor: 14 constructors on top, 5 assemblers at the bottom, one colour per recipe.
+
+<p align="center">
+  <img src="docs/images/schedule.png" alt="Machine schedule of the trained model" width="860">
+</p>
+
+The pictures come from one training run; `uv run python scripts/readme_images.py runs/<folder>` redraws them.
 
 All docs start at [docs/README.md](docs/README.md): [design](docs/design/README.md) (simulation rules, what the model decides and sees, training) and [experiments](docs/experiments/README.md) (results so far, lessons, next steps).
 
@@ -35,4 +87,4 @@ Each run folder also holds `summary.json`, `history.xlsx`, `dashboard.png`, `gan
 - `sjfactory/`: the code (`spec` → `sim` → `env` → `policies`, plus `evaluate`, `training`, `recorder`, `plots` and `web` for running and watching)
 - `tests/`: tests
 
-Generated files (`runs/`, `*.png`, `*.xlsx`, `*.zip`) are ignored by git. Don't commit them.
+Generated files (`runs/`, `*.png`, `*.xlsx`, `*.zip`) are ignored by git. Don't commit them. The pictures in `docs/images/` are the one exception.

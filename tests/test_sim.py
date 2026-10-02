@@ -1,6 +1,10 @@
+import numpy as np
 import pytest
+from gymnasium.utils.env_checker import check_env
 
-from sjfactory import STOP, FactorySim, load_scenario
+from sjfactory import STOP, FactoryEnv, FactorySim, load_scenario
+from sjfactory.env import FIRST_RECIPE_CHOICE, KEEP, STOP_CHOICE
+from sjfactory.policies import RandomPolicy
 from sjfactory.spec import scenario_from_dict
 
 
@@ -91,3 +95,49 @@ def test_same_seed_same_orders():
     a, b = FactorySim(load_scenario()), FactorySim(load_scenario())
     assert a.reset(seed=7).orders == b.reset(seed=7).orders
     assert a.reset(seed=7).orders != a.reset(seed=8).orders
+
+
+def test_env_passes_gymnasium_checks():
+    check_env(FactoryEnv(horizon=50), skip_render_check=True)
+
+
+def test_action_mask_only_lets_idle_machines_change():
+    env = FactoryEnv(horizon=50)
+    env.reset(seed=0)
+    env.step(np.zeros(env.action_space.shape, dtype=int))
+    mask = env.action_masks().reshape(env.sim.n_machines, env.n_choices)
+    running = env.sim.state.remaining > 0
+    assert running.any()
+    assert mask[:, KEEP].all()
+    assert not mask[running, STOP_CHOICE:].any()
+    idle = np.flatnonzero(~running)[0]
+    n = len(env.sim.allowed[idle])
+    assert mask[idle, STOP_CHOICE : FIRST_RECIPE_CHOICE + n].all()
+    assert not mask[idle, FIRST_RECIPE_CHOICE + n :].any()
+
+
+def test_masked_choices_become_keep():
+    env = FactoryEnv(horizon=50)
+    env.reset(seed=0)
+    env.step(np.zeros(env.action_space.shape, dtype=int))
+    busy = int(np.flatnonzero(env.sim.state.remaining > 0)[0])
+    action = np.zeros(env.action_space.shape, dtype=int)
+    action[busy] = STOP_CHOICE
+    assert env.decode(action) == {}
+    action[busy] = env.n_choices - 1
+    idle = int(np.flatnonzero(env.sim.state.remaining == 0)[0])
+    action[idle] = env.n_choices - 1  # more than this machine's recipe count
+    assert idle not in env.decode(action) or len(env.sim.allowed[idle]) == env.n_choices - 2
+
+
+def test_reward_matches_cash_change():
+    env = FactoryEnv(horizon=200, ticks_per_action=7, reward_scale=1.0)
+    _, info = env.reset(seed=1)
+    cash0, total, done = info["cash"], 0.0, False
+    policy = RandomPolicy(env.action_space, change_prob=0.3, seed=0)
+    obs = None
+    while not done:
+        obs, r, done, _, info = env.step(policy.act(obs, env.action_masks()))
+        total += r
+    assert info["clock"] == 200
+    assert info["cash"] == pytest.approx(cash0 + total)

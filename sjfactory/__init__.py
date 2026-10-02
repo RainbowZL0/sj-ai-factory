@@ -4,6 +4,7 @@ spec      scenario (fixed): materials, recipes, machines, money rules, orders
 sim       state + the one-second step rule, no decisions
 env       Gymnasium wrapper: observation encoding, action decoding, reward
 policies  decision rules: keep, random, trained model
+recorder  watches and records, exports Excel and charts
 """
 
 from sjfactory.env import FactoryEnv

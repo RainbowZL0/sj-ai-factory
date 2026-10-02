@@ -4,9 +4,9 @@ from gymnasium.utils.env_checker import check_env
 
 from sjfactory import STOP, FactoryEnv, FactorySim, load_scenario
 from sjfactory.env import FIRST_RECIPE_CHOICE, KEEP, STOP_CHOICE
-from sjfactory.policies import RandomPolicy
+from sjfactory.policies import KeepPolicy, RandomPolicy
+from sjfactory.recorder import Recorder
 from sjfactory.spec import scenario_from_dict
-
 
 # One machine that turns A into B; B can be sold
 TINY = {
@@ -141,3 +141,19 @@ def test_reward_matches_cash_change():
         total += r
     assert info["clock"] == 200
     assert info["cash"] == pytest.approx(cash0 + total)
+
+
+def test_recorder_and_save(tmp_path):
+    env = FactoryEnv(horizon=300)
+    with Recorder(env.sim) as rec:
+        env.reset(seed=0)
+        policy = KeepPolicy(env.action_space)
+        done = False
+        while not done:
+            _, _, done, _, _ = env.step(policy.act(None, None))
+    assert len(rec.reports) == 300
+    assert env.sim.listeners == []
+    rec.save(tmp_path)
+    assert {p.name for p in tmp_path.iterdir()} >= {
+        "history.xlsx", "dashboard.png", "gantt.png", "material_flow.png"
+    }

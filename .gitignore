@@ -10,3 +10,6 @@ wheels/
 # Virtual environments
 .venv
 uv.lock
+
+# Run outputs
+runs/

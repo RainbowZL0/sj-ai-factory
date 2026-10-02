@@ -22,3 +22,6 @@ logs/
 # The few pictures shown on the README are kept on purpose
 !docs/images/*.png
 *.zip
+
+# Personal Claude Code notes for this project, kept out of git
+CLAUDE.local.md

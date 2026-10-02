@@ -1,7 +1,7 @@
 [project]
-name = "a009-sj-rl-factory"
+name = "sj-rl-factory-schedule"
 version = "0.1.0"
-description = "Add your description here"
+description = "A factory simulator, and an AI that learns by trial and error which machines should make what."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

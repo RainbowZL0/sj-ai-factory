@@ -1,8 +1,8 @@
-<h1 align="center">sj-ai-factory</h1>
+<h1 align="center">sj-rl-factory-schedule</h1>
 
 <p align="center">
   A factory simulator where a reinforcement learning model decides which machine makes what.<br>
-  It learns to earn <b>twice the money</b> of the "change nothing" rule.
+  Work in progress: it already earns more than the "change nothing" rule.
 </p>
 
 <p align="center">
@@ -17,6 +17,8 @@
 </p>
 
 Reinforcement learning (RL) means a program learns by trial and error, guided by a reward score. Here the reward is money earned. Every minute the model chooses how many machines of each kind run each recipe, and the simulator plays out the next minute.
+
+This project is still in development. These are the results so far, and they will change.
 
 | Policy | Test profit | Ordered units shipped |
 |---|---|---|

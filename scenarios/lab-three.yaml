@@ -8,7 +8,7 @@ input_priority: machine_order  # as in experiment 12, where this starves the lin
 
 materials:
   Gear: {}
-  Pump: {sell_price: 800, shortfall_penalty: 400}
+  Pump: {sell_price: 800, shortfall_penalty: 800}
 
 recipes:
   Make_Gear: {category: Constructor, cycle_time: 10, power_kw: 15, inputs: {Plate: 2}, outputs: {Gear: 1}}

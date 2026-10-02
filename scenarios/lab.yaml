@@ -10,6 +10,7 @@
 # With 3 machines of each kind the factory makes at most 360 products per hour, of any mix, if machines
 # never wait and never switch. Orders ask for about 300 units per episode, so planning decides the result,
 # not demand. The mix changes per episode, so machines must switch between recipes to keep up.
+# Orders are all or nothing, as with a real customer: a short order earns nothing and is fined its full size.
 #
 # For a variant, write a file with "base: lab.yaml" and only the fields that change, e.g. lab-busy.yaml.
 
@@ -19,12 +20,14 @@ energy_price: 0        # cost per kWh
 rent_per_second: 0.5
 changeover_time: 30    # seconds a machine makes nothing after switching to a different recipe
 input_priority: downstream  # when stock is short, machines furthest from the raw materials get inputs first
+partial_delivery: false     # an order ships only in full; a short order is paid nothing and fined for every unit
 
 # Materials. Fields left out default to 0:
 #   initial_stock      stock at the start
 #   sell_price         income per unit when an order is delivered
 #   storage_cost       storage cost per unit per second
-#   shortfall_penalty  fine per unit missing when an order is due
+#   shortfall_penalty  fine per unit missing when an order is due; without partial delivery, per unit of the
+#                      whole order, so bigger orders are fined more
 materials:
   IronOre: {initial_stock: 99999}
   CopperOre: {initial_stock: 99999}
@@ -32,8 +35,8 @@ materials:
   Copper: {}
   Plate: {}
   Wire: {}
-  Motor: {sell_price: 600, shortfall_penalty: 300}
-  Frame: {sell_price: 400, shortfall_penalty: 200}
+  Motor: {sell_price: 600, shortfall_penalty: 600}
+  Frame: {sell_price: 400, shortfall_penalty: 400}
 
 # Recipes. category decides which kind of machine can run it; cycle_time is in seconds
 recipes:

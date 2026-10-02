@@ -84,6 +84,9 @@ class Scenario:
     # Which waiting machines get inputs first when stock is short. "machine_order": in the order machines are
     # listed. "downstream": machines whose recipe is further from the raw materials first, then list order.
     input_priority: str = "machine_order"
+    # True: a due order ships whatever stock exists and is paid per unit shipped. False: it ships only if the full
+    # quantity is in stock; otherwise nothing ships, nothing is paid and every unit of the order is fined.
+    partial_delivery: bool = True
 
     def __post_init__(self):
         self._validate()
@@ -247,6 +250,7 @@ def scenario_from_dict(d: dict[str, Any]) -> Scenario:
         rent_per_second=float(d.get("rent_per_second", 0.0)),
         changeover_time=int(d.get("changeover_time", 0)),
         input_priority=d.get("input_priority", "machine_order"),
+        partial_delivery=bool(d.get("partial_delivery", True)),
         materials=materials,
         recipes=recipes,
         machines=_expand_machines(d["machines"]),

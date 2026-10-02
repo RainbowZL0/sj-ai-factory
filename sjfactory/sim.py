@@ -197,6 +197,8 @@ class FactorySim:
             o = s.orders.pop(0)
             i = sc.material_index[o.product]
             shipped = min(o.quantity, s.stock[i])
+            if not sc.partial_delivery and shipped < o.quantity:
+                shipped = 0  # all or nothing: a short order ships nothing and is fined in full
             s.stock[i] -= shipped
             deliveries.append(
                 Delivery(

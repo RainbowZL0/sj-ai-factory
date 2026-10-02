@@ -7,7 +7,8 @@ uv run python -m sjfactory --scenario scenarios/lab.yaml check [runs/<folder>/be
   10 s periods; each machine kind's time in a period can be split freely over its recipes; a batch's inputs are
   taken in the period it runs and its outputs count floor(cycle / 10) periods later (a real batch never finishes
   sooner); no changeovers; every order known from the start. Every real schedule fits these rules, so no policy
-  can beat it. Fines per order not filled in full are left out, which only makes the bound higher. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
+  can beat it. Without partial delivery the bound may still fill orders in part, which only makes it higher.
+  Fines per order not filled in full are left out, which only makes the bound higher. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
   but no longer strict.
 - Look-ahead (sjfactory/lookahead.py): tries moves in a copy of the simulator each minute, so it sees
   batches and input order too. Knows every order in advance.
@@ -198,6 +199,16 @@ def oracle(env: FactoryEnv, time_limit=60):
     ub[S:] = [o.quantity for o in orders]
     integrality = np.zeros(nv)
     integrality[N:U] = 1
+    if not sc.partial_delivery:
+        # all or nothing: units shipped = quantity x (0 or 1), so each order is a yes/no choice
+        y = nv
+        nv += no
+        for i, o in enumerate(orders):
+            row([(S + i, 1.0), (y + i, -float(o.quantity))], 0, 0)
+        A = sp.csr_matrix((vals, (rows, cols)), shape=(k, nv))
+        c = np.concatenate([c, np.zeros(no)])
+        ub = np.concatenate([ub, np.ones(no)])
+        integrality = np.concatenate([integrality, np.ones(no)])
     res = milp(c, constraints=LinearConstraint(A, lo, hi), bounds=Bounds(0, ub), integrality=integrality,
                options={"time_limit": time_limit, "mip_rel_gap": 0.01})
     value = -res.fun - _all_penalties(env) - sc.rent_per_second * sc.horizon

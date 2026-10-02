@@ -14,6 +14,8 @@ With a third product whose gear maker shares plates with the assemblers ([experi
 
 Stricter penalties, per unit or per order, don't change which product gets the machines ([experiment 13](13-yardsticks-and-penalties.md)): all models ship the same mix. Product priority is a weak signal because each product displaces another on a busy machine, so the gain is only the difference in value. Order notice is generous (10 to 30 times the time to make a product). A look-ahead planner in the real simulator is now in `check`, but it is weaker than the models.
 
+**Since experiment 14 the lab ships whole orders only** (`partial_delivery: false`): a short order earns nothing and is fined its full quantity at the full price. Numbers from experiments 10 to 13 come from the old rules. Under the new rules the model reaches 89 to 91% of the upper bound on normal days, ahead of or level with the oracle, but only 79% on busy days, where the oracle gets 87%. Gamma 0.98 or 0.99 did worse than 0.97 in 500k steps.
+
 The rest of this section is about the larger factory of experiments 1 to 9 (`casters.yaml`, `varied.yaml`).
 
 
@@ -35,13 +37,14 @@ The model is no longer the main limit: on every order type it matches or beats a
 
 ## Next steps
 
-1. Shorter notice (for example 120 to 600 s) to test reacting, not just dividing machine time; show 30 orders instead of 20.
-2. Break ties in input priority: machines that make a product first, then those that make parts (under keep, `lab-three-downstream.yaml` ships no Frames).
-3. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).
-4. Harder lab variants that need planning: machine breakdowns, or a machine kind that can only run some recipes.
-5. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
-6. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
-7. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
+1. Busy days under whole orders: the model is 8 points behind the oracle at choosing which orders to drop. Try longer training on `lab-busy.yaml` (gamma 0.99 was still improving at 500k), or show the model how much work the known orders need compared with the machine time left.
+2. Shorter notice (for example 120 to 600 s) to test reacting, not just dividing machine time; show 30 orders instead of 20.
+3. Break ties in input priority: machines that make a product first, then those that make parts (under keep, `lab-three-downstream.yaml` ships no Frames).
+4. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).
+5. Harder lab variants that need planning: machine breakdowns, or a machine kind that can only run some recipes.
+6. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
+7. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
+8. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
 
 ## Experiments
 
@@ -60,6 +63,7 @@ The model is no longer the main limit: on every order type it matches or beats a
 | 11 | [11-lab-variants.md](11-lab-variants.md) | Input priority, storage costs, one tight kind, more orders than capacity | Priority changes nothing; spare time upstream helps; training on busy orders gives the best model |
 | 12 | [12-mixed-demand-and-three-products.md](12-mixed-demand-and-three-products.md) | Mixed demand; third product sharing plates across depths | Busy-day training is enough; machine order starves the line, the model works around it (93%), the oracle can't (53%) |
 | 13 | [13-yardsticks-and-penalties.md](13-yardsticks-and-penalties.md) | Look-ahead planner; strict penalties and order fines; order notice | Stricter penalties don't change priorities; the missed Motors cost only 1 to 2.5%; notice is generous |
+| 14 | [14-whole-orders-and-gamma.md](14-whole-orders-and-gamma.md) | Whole orders only, fine = full price; gamma 0.98 and 0.99 | Same behaviour; busy days are the weak spot (79% against the oracle's 87%); higher gamma worse at 500k |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

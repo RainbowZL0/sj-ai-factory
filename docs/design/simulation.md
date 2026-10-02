@@ -8,7 +8,7 @@
 2. **Start batches.** Every idle machine that has a recipe starts if the stock covers the inputs. Inputs are taken now. Machines are served in list order, or with `input_priority: downstream` the machines whose recipe is furthest from the raw materials first (`Scenario.recipe_depth`), then in list order.
 3. **Use power.** Running machines use `power_kw × 1 s` of energy.
 4. **Advance one second.** Changeovers count down. Batches that reach zero put their outputs into stock.
-5. **Settle due orders.** Orders whose due time has arrived ship whatever stock exists. Missing units cost `shortfall_penalty` each, plus `order_fine` once per order not filled in full.
+5. **Settle due orders.** Orders whose due time has arrived ship whatever stock exists. Missing units cost `shortfall_penalty` each, plus `order_fine` once per order not filled in full. With `partial_delivery: false` an order ships only if the full quantity is in stock; otherwise nothing ships, nothing is paid, every unit of the order is fined, and the stock stays for later orders.
 6. **Settle cash.** Cash changes by revenue − penalty − energy − storage − rent.
 
 All machines share one warehouse, so the scenario needs no links between machines. The real connections are the material flow chart (`material_flow.png`), drawn from the recipes.
@@ -27,14 +27,16 @@ A small factory built for quick experiments: round numbers, every load easy to c
 |---|---|---|
 | Smelter (3) | IronOre → Iron, CopperOre → Copper | 10 s per unit |
 | Constructor (3) | Iron → Plate, Copper → Wire | 10 s per unit |
-| Assembler (3) | 1 Plate + 2 Wire → Motor (sells 600, penalty 300); 2 Plate + 1 Wire → Frame (400, penalty 200) | 30 s per unit |
+| Assembler (3) | 1 Plate + 2 Wire → Motor (sells 600, penalty 600 per unit); 2 Plate + 1 Wire → Frame (400, penalty 400) | 30 s per unit |
 
 - Every product needs exactly 30 s from each kind, so the factory makes at most 360 products per hour, whatever the mix, if no machine ever waits or switches.
 - One hour per episode. 20 to 40 orders of 1 to 19 units (about 300 units, so about 86% of the factory's time), with the Motor/Frame mix drawn per episode and each order known 600 to 1800 s before it is due.
 - The machines start leaning to Frames (2 iron smelters, 2 plate constructors, 2 Frame assemblers), so keep is short of wire whenever Motors are ordered.
 - Each kind has 2 recipes, so the action is 3 choices per kind.
+- Orders are all or nothing (`partial_delivery: false`), as with a real customer: a short order earns nothing and is fined its full quantity times the product's price, so bigger orders are fined more. Experiments 10 to 13 ran before this (partial orders paid per unit, penalty half the price); their numbers come from the lab of that time.
+- Machines further down the line get inputs first (`input_priority: downstream`).
 
-On seeds 2000 to 2009, keep makes 41k (32% of the upper bound) and the oracle 126k (97%).
+On seeds 2000 to 2009, keep makes -2.9k and the oracle 109k (88% of the upper bound, 123k).
 
 Variants (each a few lines on top of `lab.yaml`):
 - `lab-busy.yaml`: 30 to 50 orders, about 410 units against a capacity of 360, so the plan also has to choose which orders to leave short.

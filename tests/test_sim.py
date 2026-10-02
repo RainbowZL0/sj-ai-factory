@@ -354,3 +354,13 @@ def test_order_fine_applies_once_per_short_order():
     sim.reset(seed=0)
     reports = [sim.step() for _ in range(5)]
     assert reports[-1].deliveries[0].penalty == 4 + 50  # 1 unit short × 4, plus the fine for the order
+
+
+def test_without_partial_delivery_a_short_order_ships_nothing():
+    sim = FactorySim(scenario_from_dict({**TINY, "partial_delivery": False}))
+    sim.reset(seed=0)
+    reports = [sim.step() for _ in range(5)]
+    d = reports[-1].deliveries[0]  # 2 of 3 B in stock when due
+    assert d.shipped == 0 and d.revenue == 0
+    assert d.penalty == 3 * 4  # every unit of the order is fined
+    assert sim.state.stock[1] == 2  # the units stay in stock

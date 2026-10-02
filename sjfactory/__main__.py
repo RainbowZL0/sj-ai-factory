@@ -48,7 +48,7 @@ def finish(rec: Recorder, out: Path, policy: str, args) -> Path:
         if name != policy:
             env = make_env(args)
             refs[name] = run_episode(env, baseline_policy(name, env, args.seed), seed=args.seed)
-    report = web.write_report(out, rec, policy, refs, note=getattr(args, "note", ""))
+    report = web.write_report(out, rec, policy, refs, note=getattr(args, "note", ""), seed=args.seed)
     web.write_index(RUNS_DIR)
     print(f"Results saved to {out}")
     return report
@@ -167,7 +167,7 @@ def cmd_train(args):
     # The report shows the best model found, on the first test seed, played in the mode that scored best
     best = MaskablePPO.load(out / "best_model") if (out / "best_model.zip").exists() else model
     args.seed = seeds[0]
-    args.note = f"{args.note} (best model, played {monitor.best_mode})".strip()
+    args.note = f"{args.note} (best model, played {monitor.best_mode}, first of test seeds {seeds[0]}-{seeds[-1]})".strip()
     finish(model_episodes(make_env(args), best, [seeds[0]], monitor.best_mode)[0], out, "model", args)
     web.write_training_page(out)
 

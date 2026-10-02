@@ -334,6 +334,7 @@ def write_report(
     policy: str,
     refs: dict[str, Recorder] | None = None,
     note: str = "",
+    seed: int | None = None,
 ) -> Path:
     """One page about one episode, with the fixed rules' episodes on the same orders for comparison"""
     out = Path(out)
@@ -388,7 +389,7 @@ def write_report(
 <header>
   <nav><a href="../index.html">← All runs</a>{'<a href="training.html">Training progress</a>' if (out / 'training.html').exists() else ''}</nav>
   <h1>{html.escape(out.name)} · {POLICY_LABEL.get(policy, policy)}</h1>
-  <div class="meta">{len(sc.machines)} machines · {s['seconds']:,} s · {html.escape(note)}</div>
+  <div class="meta">One episode{f', seed {seed}' if seed is not None else ''} · {len(sc.machines)} machines · {s['seconds']:,} s · {html.escape(note)}</div>
 </header>
 <div class="tiles">{tiles}</div>
 {_section("Cash over time", "Every policy faces the same orders. Higher at the right end is better. The flat gray line is the starting cash.", _chart(_cash_figure(curves, sc.initial_cash)))}
@@ -621,7 +622,7 @@ def write_training_page(out: Path) -> Path:
 <div class="tiles">{tiles}</div>
 {_section("Is it learning? Profit per test episode", "Every few thousand steps the model plays the same test orders twice: solid blue always takes its most likely choice, dashed blue draws choices at random from its probabilities, as in training. Blue above the orange line beats the fixed rule. A big gap between solid and dashed means the model relies on chance to spread its machines over recipes. Shaded bands: best and worst test episode. Gray: the score while training.", _chart(fig))}
 <div class="grid2">
-{_section("Order units shipped (%)", "Share of ordered units that were in stock when due. Blue solid / dashed = model without / with randomness; orange = keep; aqua = random.", _chart(eval_line("fill_rate", "%", "fill_rate", pct=True)))}
+{_section("Order units shipped (%)", "Share of ordered units that were in stock when due, mean over the test seeds. Blue solid / dashed = model without / with randomness; orange = keep; aqua = random.", _chart(eval_line("fill_rate", "%", "fill_rate", pct=True)))}
 {_section("Machines busy (%)", "Share of machine-seconds spent running. Busy is not always good: making the wrong thing costs money.", _chart(eval_line("busy", "%", "machine_busy_ratio", pct=True)))}
 {_section("Revenue and penalties per test episode", "Penalties fall when fewer ordered units are missing.", _chart(money))}
 {_section("Latest test episode: cash over time", "First test seed. Same orders for every policy.", _chart(_cash_figure(curves, cfg.get("initial_cash", 0))) if curves else "")}

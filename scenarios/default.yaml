@@ -1,0 +1,74 @@
+# Default scenario: merged from the old spec_yaml/*.yaml files, same values.
+# One scenario = one file. Each material is listed here exactly once.
+
+horizon: 5000          # seconds per episode
+initial_cash: 1000
+energy_price: 0        # cost per kWh
+rent_per_second: 0.5
+
+# Materials. Fields left out default to 0:
+#   initial_stock      stock at the start
+#   sell_price         income per unit when an order is delivered
+#   storage_cost       storage cost per unit per second
+#   shortfall_penalty  fine per unit missing when an order is due
+materials:
+  IronOre: {}
+  CopperOre: {}
+  Coal: {}
+  IronIngot: {initial_stock: 99999}
+  CopperIngot: {initial_stock: 99999}
+  SteelIngot: {initial_stock: 99999}
+  IronBar: {}
+  Screw: {}
+  Rotor: {}
+  IronPlate: {}
+  SteelTube: {}
+  Wire: {}
+  Stator: {}
+  ReinforcedPlate: {}
+  Motor: {sell_price: 800}
+  Frame: {sell_price: 300}
+
+# Recipes. category decides which kind of machine can run it; cycle_time is in seconds
+recipes:
+  # T1 smelting
+  Cast_Iron:      {category: Caster, cycle_time: 2,  power_kw: 45, inputs: {IronOre: 1}, outputs: {IronIngot: 1}}
+  Cast_Steel:     {category: Caster, cycle_time: 4,  power_kw: 50, inputs: {IronOre: 3, Coal: 3}, outputs: {SteelIngot: 3}}
+  Cast_Copper:    {category: Caster, cycle_time: 60, power_kw: 50, inputs: {CopperOre: 30}, outputs: {CopperIngot: 30}}
+  # T2 first processing
+  Ingot_2_Bar:    {category: Constructor, cycle_time: 4, power_kw: 15, inputs: {IronIngot: 1}, outputs: {IronBar: 1}}
+  Ingot_2_Plate:  {category: Constructor, cycle_time: 6, power_kw: 15, inputs: {IronIngot: 3}, outputs: {IronPlate: 2}}
+  Ingot_2_Tube:   {category: Constructor, cycle_time: 6, power_kw: 15, inputs: {SteelIngot: 3}, outputs: {SteelTube: 2}}
+  Ingot_2_Wire:   {category: Constructor, cycle_time: 4, power_kw: 15, inputs: {CopperIngot: 1}, outputs: {Wire: 2}}
+  # T3 further processing
+  Bar_2_Screw:    {category: Constructor, cycle_time: 12, power_kw: 12, inputs: {IronBar: 3}, outputs: {Screw: 8}}
+  # T4 assembly
+  RotorAssemble:  {category: Assembler, cycle_time: 15, power_kw: 20, inputs: {IronBar: 5, Screw: 25}, outputs: {Rotor: 1}}
+  StatorAssemble: {category: Assembler, cycle_time: 12, power_kw: 20, inputs: {SteelTube: 3, Wire: 8}, outputs: {Stator: 1}}
+  PlateAssemble:  {category: Assembler, cycle_time: 12, power_kw: 20, inputs: {IronPlate: 6, Screw: 8}, outputs: {ReinforcedPlate: 1}}
+  # T5 final assembly
+  MotorFinal:     {category: Assembler, cycle_time: 12, power_kw: 30, inputs: {Rotor: 2, Stator: 2}, outputs: {Motor: 1}}
+  FrameFinal:     {category: Assembler, cycle_time: 60, power_kw: 30, inputs: {ReinforcedPlate: 3, IronBar: 12}, outputs: {Frame: 2}}
+
+# Machines: groups of "category + starting recipe + count". IDs are generated (CASTER-01, CASTER-02, ...).
+# All machines share one warehouse, so no upstream/downstream links are needed.
+machines:
+  - {category: Caster, recipe: Cast_Iron, count: 3}
+  - {category: Caster, recipe: Cast_Steel, count: 2}
+  - {category: Caster, recipe: Cast_Copper, count: 1}
+  - {category: Constructor, recipe: Ingot_2_Bar, count: 6}
+  - {category: Constructor, recipe: Bar_2_Screw, count: 4}
+  - {category: Constructor, recipe: Ingot_2_Tube, count: 2}
+  - {category: Constructor, recipe: Ingot_2_Wire, count: 2}
+  - {category: Assembler, recipe: RotorAssemble, count: 2}
+  - {category: Assembler, recipe: StatorAssemble, count: 2}
+  - {category: Assembler, recipe: MotorFinal, count: 1}
+
+orders:
+  # Fixed orders: {product, quantity, due_time}; due_time is in absolute seconds
+  fixed: []
+  # Generated from the random seed at the start of each episode: quantity within the range (both ends included), due time in [0, horizon)
+  random:
+    count: 50
+    products: [Motor, Frame]
+    quantity: [1, 10]

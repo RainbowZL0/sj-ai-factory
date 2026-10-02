@@ -15,3 +15,12 @@ dependencies = [
     "sb3-contrib>=2.6.0",
     "tensorboard>=2.19.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

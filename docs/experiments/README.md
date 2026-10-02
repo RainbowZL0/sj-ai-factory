@@ -20,12 +20,15 @@ Two trained models, both with the move action and a move cost of 50, on the cast
 - Early orders used to be impossible (the first Frame takes about 550 s). Orders can now have a notice time, and nothing is due before it.
 - A move cost of 50 in the reward cut changeovers from 203 to 46 per episode on varied orders, without losing profit.
 
+The model is no longer the main limit: on every order type it matches or beats an oracle planner that knows all orders in advance ([experiment 9](09-bottleneck-analysis.md)). With the usual orders, demand is the limit; with heavy orders, the constructors' iron bar and screw time. Use `scripts/ceiling.py` to see how close a model gets to the upper bound.
+
 ## Next steps
 
-1. Train the varied model longer (it was still improving at 1M steps), for example 3M steps, and make `scenarios/varied.yaml` the main training scenario.
-2. Give products a storage cost: making to stock is free now, which matters once orders arrive during the episode.
-3. Check how much of the tough case's loss any plan could avoid, for example with a rule that puts everything into Motors.
-4. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
+1. Train the varied model longer (for example 3M steps; it was still improving at 1M) and make `scenarios/varied.yaml` the main training scenario. It is 10k behind the usual model on the usual orders.
+2. Report each run as a share of the upper bound (`scripts/ceiling.py`), not only against keep.
+3. For more profit, change the factory rather than the model: more constructors or a faster bar recipe; downstream machines first in line for inputs (today inputs go to machines in index order); storage costs so leftover parts count.
+4. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
+5. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
 
 ## Experiments
 
@@ -39,6 +42,7 @@ Two trained models, both with the move action and a move cost of 50, on the cast
 | 6 | [06-other-orders.md](06-other-orders.md) | Best model on new seeds and differently shaped orders | Wins on all new seeds; loses to keep when demand exceeds capacity or most orders are Motors |
 | 7 | [07-move-action-and-casters.md](07-move-action-and-casters.md) | Action becomes one move per kind; casters back | Same 118k, reached in less than half the steps, half the changeovers; casters learned fine |
 | 8 | [08-varied-orders.md](08-varied-orders.md) | Notice times, varied orders per episode, move cost | Beats keep on every order shape; 10k less on the usual one; move cost cuts switches 4 times |
+| 9 | [09-bottleneck-analysis.md](09-bottleneck-analysis.md) | Analysis: upper bound and oracle planner | Models match the oracle; limits are demand, then constructor time and batch flow |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 
@@ -53,4 +57,4 @@ A new experiment page says: what changed and why, the run folder, the settings, 
 - **Give each different decision exactly one action.** When many actions meant the same plan, learning took twice as long. (7)
 - **Test on orders of other shapes, not only other seeds.** A model can win on every new seed and still only know one plan. (6)
 - **Train on the variety you want handled.** Varied orders per episode taught the model to read the orders. (8)
-- **Check what is possible before blaming the model.** All the missed units were in orders no plan could fill in time. (8)
+- **Check what is possible before blaming the model.** All the missed units were in orders no plan could fill in time. (8) An upper bound and an oracle show how much is left to gain. (9)

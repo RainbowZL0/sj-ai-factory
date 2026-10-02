@@ -36,3 +36,4 @@ The 0.99 run was still setting new bests at the end; the other two had levelled 
 - **Whole orders change the scores, not the models' behaviour.** Models trained under the old rules do as well under the new ones as models trained under them. They already filled most orders in full, since partial fills only happen when stock runs out.
 - **The weak spot is busy days: choosing which orders to drop.** With more orders than capacity, the model is 8 points behind the oracle (79% against 87%), and training under the new rules didn't close it. Here the new rules matter most: an order 1 unit short earns nothing, so a plan has to give up whole orders on purpose.
 - **Looking further ahead didn't help in 500k steps.** Gamma 0.98 and 0.99 both did worse than 0.97. A longer look-ahead makes the reward estimates noisier and learning slower, and 0.99 was still improving, so it may need more steps.
+- **Decision: gamma stays at 0.97.**

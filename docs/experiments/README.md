@@ -37,7 +37,7 @@ The model is no longer the main limit: on every order type it matches or beats a
 
 ## Next steps
 
-1. Busy days under whole orders: the model is 8 points behind the oracle at choosing which orders to drop. Try longer training on `lab-busy.yaml` (gamma 0.99 was still improving at 500k), or show the model how much work the known orders need compared with the machine time left.
+1. Busy days under whole orders: the model is 8 points behind the oracle at choosing which orders to drop. Try longer training on `lab-busy.yaml` (gamma stays 0.97), or show the model how much work the known orders need compared with the machine time left.
 2. Shorter notice (for example 120 to 600 s) to test reacting, not just dividing machine time; show 30 orders instead of 20.
 3. Break ties in input priority: machines that make a product first, then those that make parts (under keep, `lab-three-downstream.yaml` ships no Frames).
 4. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).

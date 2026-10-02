@@ -1,0 +1,140 @@
+{
+    // Pick one in the Run and Debug view (Ctrl+Shift+D), then press F5 to debug or Ctrl+F5 to run without the debugger.
+    // Training is much faster with Ctrl+F5. Every command opens its result page in the browser.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train (asks for steps and a note)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--note", "${input:note}", "train", "--steps", "${input:steps}"],
+            "presentation": { "group": "1 train", "order": 1 }
+        },
+        {
+            "name": "Train quick check (20k steps)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--note", "quick check", "train", "--steps", "20000", "--test-every", "5000"],
+            "presentation": { "group": "1 train", "order": 2 }
+        },
+        {
+            "name": "Eval a saved model",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["eval", "${input:model}", "--mode", "${input:mode}"],
+            "presentation": { "group": "2 run", "order": 1 }
+        },
+        {
+            "name": "Run keep policy",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["run", "--policy", "keep"],
+            "presentation": { "group": "2 run", "order": 2 }
+        },
+        {
+            "name": "Run random policy",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["run", "--policy", "random"],
+            "presentation": { "group": "2 run", "order": 3 }
+        },
+        {
+            "name": "Open all runs page",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["view"],
+            "presentation": { "group": "3 view", "order": 1 }
+        },
+        {
+            "name": "Rebuild and open one run's page",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["view", "${input:runFolder}"],
+            "presentation": { "group": "3 view", "order": 2 }
+        },
+        {
+            "name": "Tests (pytest)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["-q"],
+            "justMyCode": false,
+            "presentation": { "group": "4 dev", "order": 1 }
+        },
+        {
+            "name": "Current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "presentation": { "group": "4 dev", "order": 2 }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "note",
+            "type": "promptString",
+            "description": "Short note shown on the result pages: what did you change?",
+            "default": ""
+        },
+        {
+            "id": "steps",
+            "type": "pickString",
+            "description": "Training steps",
+            "options": ["20000", "200000", "500000", "1000000"],
+            "default": "1000000"
+        },
+        {
+            "id": "model",
+            "type": "promptString",
+            "description": "Model file to evaluate (copy the path of a best_model.zip from runs/)",
+            "default": "runs/<folder>/best_model.zip"
+        },
+        {
+            "id": "mode",
+            "type": "pickString",
+            "description": "fixed: always the most likely choice; sampled: random draws from the model's probabilities",
+            "options": ["fixed", "sampled"],
+            "default": "fixed"
+        },
+        {
+            "id": "runFolder",
+            "type": "promptString",
+            "description": "Run folder to rebuild, e.g. runs/1002_145003-train",
+            "default": "runs/"
+        }
+    ]
+}

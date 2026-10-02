@@ -64,6 +64,7 @@ class Scenario:
     initial_cash: float
     energy_price: float  # per kWh
     rent_per_second: float
+    changeover_time: int  # seconds a machine makes nothing after switching to a different recipe
     materials: tuple[Material, ...]
     recipes: tuple[Recipe, ...]
     machines: tuple[Machine, ...]
@@ -89,6 +90,23 @@ class Scenario:
             names |= set(self.random_orders.products)
         return tuple(m.name for m in self.materials if m.name in names)
 
+    @cached_property
+    def obtainable(self) -> frozenset[str]:
+        """Materials the factory can ever have: those in stock at the start, plus anything made from them"""
+        have = {m.name for m in self.materials if m.initial_stock > 0}
+        grew = True
+        while grew:
+            grew = False
+            for r in self.recipes:
+                if set(r.inputs) <= have and not set(r.outputs) <= have:
+                    have |= set(r.outputs)
+                    grew = True
+        return frozenset(have)
+
+    def can_ever_run(self, recipe: int) -> bool:
+        """False if the recipe needs a material the factory can never get (ore, for example, is never bought)"""
+        return set(self.recipes[recipe].inputs) <= self.obtainable
+
     def recipes_for(self, category: str) -> tuple[int, ...]:
         """Indexes of the recipes a machine category can run"""
         return tuple(i for i, r in enumerate(self.recipes) if r.category == category)
@@ -106,6 +124,8 @@ class Scenario:
         check_unique("machine", (m.id for m in self.machines))
         if self.horizon < 1:
             raise ValueError("horizon must be at least 1")
+        if self.changeover_time < 0:
+            raise ValueError("changeover_time must not be negative")
 
         materials = {m.name for m in self.materials}
         recipes = {r.name: r for r in self.recipes}
@@ -162,6 +182,7 @@ def scenario_from_dict(d: dict[str, Any]) -> Scenario:
         initial_cash=float(d.get("initial_cash", 0.0)),
         energy_price=float(d.get("energy_price", 0.0)),
         rent_per_second=float(d.get("rent_per_second", 0.0)),
+        changeover_time=int(d.get("changeover_time", 0)),
         materials=materials,
         recipes=recipes,
         machines=_expand_machines(d["machines"]),

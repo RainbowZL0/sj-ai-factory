@@ -7,7 +7,7 @@ from typing import Protocol
 import numpy as np
 from gymnasium import spaces
 
-from sjfactory.env import KEEP
+from sjfactory.env import NO_CHANGE
 
 
 class Policy(Protocol):
@@ -15,32 +15,28 @@ class Policy(Protocol):
 
 
 class KeepPolicy:
-    """Never switches recipes: each machine keeps its starting recipe and starts whenever inputs are in stock
-    (the old code's "greedy" mode)"""
+    """Never makes a plan, so no machine switches: each keeps its starting recipe and starts whenever inputs are
+    in stock (the old code's "greedy" mode)"""
 
     def __init__(self, action_space: spaces.MultiDiscrete):
-        self.n_machines = len(action_space.nvec)
+        self.n_slots = len(action_space.nvec)
 
     def act(self, obs, mask):
-        return np.full(self.n_machines, KEEP)
+        return np.full(self.n_slots, NO_CHANGE)
 
 
 class RandomPolicy:
-    """With probability change_prob, an idle machine picks a random allowed action; otherwise it keeps"""
+    """With probability change_prob per decision, makes a random plan; otherwise keeps the previous one"""
 
-    def __init__(self, action_space: spaces.MultiDiscrete, change_prob=0.02, seed=None):
+    def __init__(self, action_space: spaces.MultiDiscrete, change_prob=0.1, seed=None):
         self.nvec = action_space.nvec
         self.change_prob = change_prob
         self.rng = np.random.default_rng(seed)
 
     def act(self, obs, mask):
-        mask = mask.reshape(len(self.nvec), -1)
-        action = np.full(len(self.nvec), KEEP)
-        for m, row in enumerate(mask):
-            choices = np.flatnonzero(row)
-            if len(choices) > 1 and self.rng.random() < self.change_prob:
-                action[m] = self.rng.choice(choices)
-        return action
+        if self.rng.random() < self.change_prob:
+            return self.rng.integers(0, self.nvec)
+        return np.full(len(self.nvec), NO_CHANGE)
 
 
 class ModelPolicy:

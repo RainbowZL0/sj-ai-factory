@@ -5,6 +5,9 @@ sim       state + the one-second step rule, no decisions
 env       Gymnasium wrapper: observation encoding, action decoding, reward
 policies  decision rules: keep, random, trained model
 recorder  watches and records, exports Excel and charts
+evaluate  runs whole episodes with a policy
+training  checks the model on fixed test orders while it trains
+web       interactive result pages: one per run, live training, all runs
 """
 
 from sjfactory.env import FactoryEnv

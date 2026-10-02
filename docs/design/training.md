@@ -6,7 +6,7 @@ MaskablePPO from sb3-contrib (PPO is a standard RL training method) with the def
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--steps` | 1,000,000 | decisions to train on (about 13 minutes) |
+| `--steps` | 1,000,000 | decisions to train on (about 8 minutes on the lab factory, 13 on the larger one) |
 | `--ticks` | 60 | seconds per decision |
 | `--gamma` | 0.97 | how far ahead rewards count: about 33 decisions, or 2000 s, the scale on which orders pay out |
 | `--envs` | 20 | environments simulated at once, one process each |

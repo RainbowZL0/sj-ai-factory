@@ -13,7 +13,7 @@ from typing import Any
 from ruamel.yaml import YAML
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SCENARIO = PROJECT_ROOT / "scenarios" / "default.yaml"
+DEFAULT_SCENARIO = PROJECT_ROOT / "scenarios" / "lab.yaml"
 
 
 @dataclass(frozen=True)
@@ -176,8 +176,26 @@ class Scenario:
 
 
 def load_scenario(path: str | Path = DEFAULT_SCENARIO) -> Scenario:
-    data = YAML(typ="safe").load(Path(path).read_text(encoding="utf-8"))
-    return scenario_from_dict(data)
+    return scenario_from_dict(read_scenario_dict(path))
+
+
+def read_scenario_dict(path: str | Path) -> dict[str, Any]:
+    """The scenario file as a dict. A file with "base: other.yaml" starts from that file (path relative to this
+    one) and changes only what it lists: nested mappings are merged key by key, anything else is replaced."""
+    path = Path(path)
+    data = YAML(typ="safe").load(path.read_text(encoding="utf-8")) or {}
+    base = data.pop("base", None)
+    return _merge(read_scenario_dict(path.parent / base), data) if base else data
+
+
+def _merge(base: dict, changes: dict) -> dict:
+    out = dict(base)
+    for key, value in changes.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _merge(out[key], value)
+        else:
+            out[key] = value
+    return out
 
 
 def scenario_from_dict(d: dict[str, Any]) -> Scenario:

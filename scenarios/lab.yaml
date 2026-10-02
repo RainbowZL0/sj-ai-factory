@@ -1,0 +1,71 @@
+# Lab scenario: a small factory with round numbers, built for quick experiments and comparisons.
+# Three machine kinds, two recipes each, two products. Every product needs exactly 30 s of work from each
+# kind, so the load on every machine kind can be checked by hand; `python -m sjfactory check` prints it.
+#
+#   Smelter      IronOre -> Iron           CopperOre -> Copper       10 s per unit
+#   Constructor  Iron -> Plate             Copper -> Wire            10 s per unit
+#   Assembler    1 Plate + 2 Wire -> Motor                           30 s per unit
+#                2 Plate + 1 Wire -> Frame                           30 s per unit
+#
+# With 3 machines of each kind the factory makes at most 360 products per hour, of any mix, if machines
+# never wait and never switch. Orders ask for about 300 units per episode, so planning decides the result,
+# not demand. The mix changes per episode, so machines must switch between recipes to keep up.
+#
+# For a variant, write a file with "base: lab.yaml" and only the fields that change, e.g. lab-busy.yaml.
+
+horizon: 3600          # seconds per episode
+initial_cash: 1000
+energy_price: 0        # cost per kWh
+rent_per_second: 0.5
+changeover_time: 30    # seconds a machine makes nothing after switching to a different recipe
+
+# Materials. Fields left out default to 0:
+#   initial_stock      stock at the start
+#   sell_price         income per unit when an order is delivered
+#   storage_cost       storage cost per unit per second
+#   shortfall_penalty  fine per unit missing when an order is due
+materials:
+  IronOre: {initial_stock: 99999}
+  CopperOre: {initial_stock: 99999}
+  Iron: {}
+  Copper: {}
+  Plate: {}
+  Wire: {}
+  Motor: {sell_price: 600, shortfall_penalty: 300}
+  Frame: {sell_price: 400, shortfall_penalty: 200}
+
+# Recipes. category decides which kind of machine can run it; cycle_time is in seconds
+recipes:
+  Smelt_Iron:   {category: Smelter, cycle_time: 10, power_kw: 40, inputs: {IronOre: 1}, outputs: {Iron: 1}}
+  Smelt_Copper: {category: Smelter, cycle_time: 10, power_kw: 40, inputs: {CopperOre: 1}, outputs: {Copper: 1}}
+  Make_Plate:   {category: Constructor, cycle_time: 10, power_kw: 15, inputs: {Iron: 1}, outputs: {Plate: 1}}
+  Make_Wire:    {category: Constructor, cycle_time: 10, power_kw: 15, inputs: {Copper: 1}, outputs: {Wire: 1}}
+  Make_Motor:   {category: Assembler, cycle_time: 30, power_kw: 20, inputs: {Plate: 1, Wire: 2}, outputs: {Motor: 1}}
+  Make_Frame:   {category: Assembler, cycle_time: 30, power_kw: 20, inputs: {Plate: 2, Wire: 1}, outputs: {Frame: 1}}
+
+# Machines: groups of "category + starting recipe + count". IDs are generated (SMELTER-01, SMELTER-02, ...).
+# All machines share one warehouse. The start leans to Frames, so keep (never switch) is fine for Frame-heavy
+# orders and short of wire for Motor-heavy ones.
+machines:
+  - {category: Smelter, recipe: Smelt_Iron, count: 2}
+  - {category: Smelter, recipe: Smelt_Copper, count: 1}
+  - {category: Constructor, recipe: Make_Plate, count: 2}
+  - {category: Constructor, recipe: Make_Wire, count: 1}
+  - {category: Assembler, recipe: Make_Frame, count: 2}
+  - {category: Assembler, recipe: Make_Motor, count: 1}
+
+orders:
+  # Fixed orders: {product, quantity, due_time}; due_time is in absolute seconds
+  fixed: []
+  # Generated from the random seed at the start of each episode. A [low, high] range is drawn from, both ends included:
+  #   count     number of orders, drawn per episode
+  #   quantity  units per order
+  #   mix       even: each order picks a product with equal chance; random: each episode draws its own mix,
+  #             and a quarter of episodes order only one product
+  #   notice    seconds between an order becoming known and its due time; nothing is due before the shortest notice
+  random:
+    count: [20, 40]
+    products: [Motor, Frame]
+    quantity: [1, 19]
+    mix: random
+    notice: [600, 1800]

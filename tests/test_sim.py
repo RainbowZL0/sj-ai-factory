@@ -10,6 +10,8 @@ from sjfactory.policies import KeepPolicy, RandomPolicy
 from sjfactory.recorder import Recorder
 from sjfactory.spec import PROJECT_ROOT, scenario_from_dict
 
+FACTORY = PROJECT_ROOT / "scenarios" / "default.yaml"  # the large factory most tests were written for
+
 # One machine that turns A into B; B can be sold
 TINY = {
     "horizon": 20,
@@ -86,7 +88,7 @@ def test_unknown_material_rejected():
 
 
 def test_default_scenario_loads_with_old_machine_ids():
-    sc = load_scenario()
+    sc = load_scenario(FACTORY)
     ids = [m.id for m in sc.machines]
     assert len(ids) == 25
     assert ids[0] == "CASTER-01" and ids[-1] == "ASSEMBLER-05"
@@ -94,7 +96,7 @@ def test_default_scenario_loads_with_old_machine_ids():
 
 
 def test_same_seed_same_orders():
-    a, b = FactorySim(load_scenario()), FactorySim(load_scenario())
+    a, b = FactorySim(load_scenario(FACTORY)), FactorySim(load_scenario(FACTORY))
     assert a.reset(seed=7).orders == b.reset(seed=7).orders
     assert a.reset(seed=7).orders != a.reset(seed=8).orders
 
@@ -127,7 +129,7 @@ def test_orders_are_hidden_until_known():
 
 
 def test_move_cost_only_lowers_the_reward():
-    env = FactoryEnv(horizon=120, ticks_per_action=60, reward_scale=1.0, move_cost=100)
+    env = FactoryEnv(FACTORY, horizon=120, ticks_per_action=60, reward_scale=1.0, move_cost=100)
     _, info = env.reset(seed=0)
     constructors = env.kinds[0]
     action = env.start_action()
@@ -137,11 +139,11 @@ def test_move_cost_only_lowers_the_reward():
 
 
 def test_env_passes_gymnasium_checks():
-    check_env(FactoryEnv(horizon=50), skip_render_check=True)
+    check_env(FactoryEnv(FACTORY, horizon=50), skip_render_check=True)
 
 
 def test_recipes_that_can_never_run_get_no_slot():
-    env = FactoryEnv(horizon=50)
+    env = FactoryEnv(FACTORY, horizon=50)
     sc = env.sim.scenario
     assert "IronOre" not in sc.obtainable and "Motor" in sc.obtainable
     assert [k.category for k in env.kinds] == ["Constructor", "Assembler"]  # every caster recipe needs ore
@@ -160,7 +162,7 @@ def move(kind, a, b):
 
 
 def test_moves_are_unique_and_masked():
-    env = FactoryEnv(horizon=50)
+    env = FactoryEnv(FACTORY, horizon=50)
     env.reset(seed=0)
     for k in env.kinds:
         assert len(set(k.moves)) == len(k.moves)
@@ -173,7 +175,7 @@ def test_moves_are_unique_and_masked():
 
 
 def test_plan_switches_idle_machines_only_and_keeps_the_rest():
-    env = FactoryEnv(horizon=400, ticks_per_action=1)
+    env = FactoryEnv(FACTORY, horizon=400, ticks_per_action=1)
     env.reset(seed=0)
     start = env.start_action()
     env.step(start)  # no change: nothing switches
@@ -218,7 +220,7 @@ def test_changeover_delays_the_new_recipe():
 
 
 def test_reward_matches_cash_change():
-    env = FactoryEnv(horizon=200, ticks_per_action=7, reward_scale=1.0)
+    env = FactoryEnv(FACTORY, horizon=200, ticks_per_action=7, reward_scale=1.0)
     _, info = env.reset(seed=1)
     cash0, total, done = info["cash"], 0.0, False
     policy = RandomPolicy(env.action_space, change_prob=0.3, seed=0)
@@ -231,7 +233,7 @@ def test_reward_matches_cash_change():
 
 
 def test_recorder_and_save(tmp_path):
-    env = FactoryEnv(horizon=300)
+    env = FactoryEnv(FACTORY, horizon=300)
     with Recorder(env.sim) as rec:
         env.reset(seed=0)
         policy = KeepPolicy(env.action_space)
@@ -249,7 +251,7 @@ def test_web_pages(tmp_path):
     from sjfactory import web
     from sjfactory.evaluate import baseline_policy, run_episode
 
-    env = FactoryEnv(horizon=200, ticks_per_action=5)
+    env = FactoryEnv(FACTORY, horizon=200, ticks_per_action=5)
     run = tmp_path / "0101_000000-keep"
     run.mkdir()
     rec = run_episode(env, baseline_policy("keep", env), seed=0)
@@ -269,3 +271,42 @@ def test_web_pages(tmp_path):
     index = web.write_index(tmp_path).read_text(encoding="utf-8")
     assert run.name in index
     assert (tmp_path / "plotly.min.js").exists()
+
+
+def test_variant_file_changes_only_what_it_lists(tmp_path):
+    (tmp_path / "variant.yaml").write_text(
+        f"base: {(PROJECT_ROOT / 'scenarios' / 'lab.yaml').as_posix()}\n"
+        "recipes: {Make_Plate: {cycle_time: 5}}\n"
+        "orders: {random: {count: [50, 50]}}\n",
+        encoding="utf-8",
+    )
+    lab, variant = load_scenario(PROJECT_ROOT / "scenarios" / "lab.yaml"), load_scenario(tmp_path / "variant.yaml")
+    plate = lab.recipe_index["Make_Plate"]
+    assert variant.recipes[plate].cycle_time == 5
+    assert variant.recipes[plate].inputs == lab.recipes[plate].inputs  # merged, not replaced
+    assert variant.random_orders.count_range == (50, 50)
+    assert variant.random_orders.notice_range == lab.random_orders.notice_range
+    assert variant.machines == lab.machines
+
+
+def test_lab_is_balanced_and_the_default():
+    from sjfactory.check import unit_load
+
+    sc = load_scenario()
+    assert sc == load_scenario(PROJECT_ROOT / "scenarios" / "lab.yaml")
+    # every product needs 30 s from each kind, as the scenario file says
+    assert unit_load(sc) == {p: {"Smelter": 30.0, "Constructor": 30.0, "Assembler": 30.0} for p in ("Motor", "Frame")}
+    env = FactoryEnv(horizon=700)
+    assert env.action_space.nvec.tolist() == [3, 3, 3]
+    check_env(env, skip_render_check=True)
+
+
+def test_upper_bound_is_above_keep():
+    from sjfactory.check import bound
+    from sjfactory.evaluate import run_episode
+
+    env = FactoryEnv(ticks_per_action=60)
+    env.reset(seed=2000)
+    b = bound(env)
+    keep = run_episode(env, KeepPolicy(env.action_space), seed=2000).summary()["profit"]
+    assert keep < b

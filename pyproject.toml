@@ -14,13 +14,13 @@ dependencies = [
     "plotly>=7.1.0",
     "ruamel-yaml>=0.18.10",
     "sb3-contrib>=2.6.0",
+    "scipy>=1.18.1",
     "tensorboard>=2.19.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
-    "scipy>=1.18.1",
 ]
 
 [tool.pytest.ini_options]

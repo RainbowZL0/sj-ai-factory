@@ -1,6 +1,6 @@
 # 9. What limits profit now? (analysis, no training)
 
-2026-10-02. Models from [experiment 8](08-varied-orders.md): `1002_194645-train` (trained on the usual orders, casters factory, move cost 50) and `1002_194725-train` (trained on varied orders, move cost 50). Tool: `scripts/ceiling.py`.
+2026-10-02. Models from [experiment 8](08-varied-orders.md): `1002_194645-train` (trained on the usual orders, casters factory, move cost 50) and `1002_194725-train` (trained on varied orders, move cost 50). Tool: `scripts/ceiling.py`, since replaced by `python -m sjfactory check`.
 
 ## Two yardsticks
 

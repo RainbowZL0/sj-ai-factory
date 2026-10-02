@@ -4,6 +4,7 @@ uv run python -m sjfactory run --policy keep
 uv run python -m sjfactory train --steps 1000000 --note "what I changed"
 uv run python -m sjfactory eval runs/<time>-train/best_model.zip --mode sampled
 uv run python -m sjfactory view                 # open the page listing all runs
+uv run python -m sjfactory check [models ...]   # machine load, keep, oracle and upper bound, no training
 """
 
 from __future__ import annotations
@@ -193,6 +194,15 @@ def cmd_view(args):
     open_page(page, args)
 
 
+def cmd_check(args):
+    from sjfactory.check import run_check
+
+    run_check(
+        args.scenario, args.models, range(args.first_seed, args.first_seed + args.episodes), horizon=args.horizon,
+        oracle_seconds=args.oracle_seconds, workers=args.workers,
+    )
+
+
 def main():
     p = argparse.ArgumentParser(prog="sjfactory")
     p.add_argument("--scenario", default=str(DEFAULT_SCENARIO))
@@ -236,6 +246,14 @@ def main():
     v = sub.add_parser("view", help="rebuild and open the page of one run, or of all runs")
     v.add_argument("run", nargs="?", help="run folder; leave out to open the list of all runs")
     v.set_defaults(func=cmd_view)
+
+    c = sub.add_parser("check", help="machine load, keep, oracle and upper bound in seconds; no training")
+    c.add_argument("models", nargs="*", help="trained models to compare, played with their most likely choice")
+    c.add_argument("--episodes", type=int, default=10, help="seeds checked, starting at --seed")
+    c.add_argument("--oracle-seconds", type=int, default=30, help="time limit per oracle solve; 0 skips the oracle")
+    c.add_argument("--workers", type=int, default=None, help="processes (default: one per episode, up to the cores)")
+    c.add_argument("--first-seed", type=int, default=2000, help="first seed; no training run tests on 2000 and up")
+    c.set_defaults(func=cmd_check)
 
     args = p.parse_args()
     args.func(args)

@@ -26,7 +26,7 @@ This project is still in development. These are the results so far, and they wil
 | Keep (every machine stays on its starting recipe) | 58.9k | 39% |
 | Random plans (before the move action) | -68.3k | about 2% |
 
-Profit is the mean over three test episodes with fixed orders.
+Profit is the mean over three test episodes with fixed orders, on the larger factory of experiments 1 to 9 (`scenarios/casters.yaml`). The default is now the small lab factory (`scenarios/lab.yaml`).
 
 ## How it works
 
@@ -66,6 +66,7 @@ uv run python -m sjfactory run --policy random
 uv run python -m sjfactory --note "what I changed" train --steps 1000000   # MaskablePPO; steps = decisions, one per 60 s
 uv run python -m sjfactory eval runs/<folder>/best_model.zip --mode sampled   # or --mode fixed
 uv run python -m sjfactory view                      # list of all runs in the browser
+uv run python -m sjfactory check                     # machine load, keep, oracle and upper bound in under a minute, no training
 uv run pytest
 ```
 
@@ -85,7 +86,8 @@ Each run folder also holds `summary.json`, `history.xlsx`, `dashboard.png`, `gan
 
 ## Layout
 
-- `scenarios/default.yaml`: the whole factory in one file (materials, recipes, machines, money, orders)
+- `scenarios/lab.yaml`: the default factory, small and balanced for quick experiments. A variant file names it as `base:` and lists only what changes (see `lab-busy.yaml`)
+- `scenarios/default.yaml`, `casters.yaml`, `varied.yaml`: the larger factory used in experiments 1 to 9
 - `sjfactory/`: the code (`spec` → `sim` → `env` → `policies`, plus `evaluate`, `training`, `recorder`, `plots` and `web` for running and watching)
 - `tests/`: tests
 

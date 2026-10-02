@@ -6,6 +6,11 @@ All profits are the mean over test seeds 1000, 1001 and 1002 (the same orders ev
 
 ## Where things stand (2026-10-02)
 
+**New default: the small lab factory** ([experiment 10](10-lab-factory.md)). It has 9 machines, round numbers and a load that can be checked by hand. A training run reaches its plateau in about 2 minutes. `python -m sjfactory check` shows keep, the oracle and the upper bound in under a minute. On new seeds the model reaches 96% of the upper bound (oracle 97%, keep 32%). Test ideas for the factory here first, as variant files (`base: lab.yaml`).
+
+The rest of this section is about the larger factory of experiments 1 to 9 (`casters.yaml`, `varied.yaml`).
+
+
 Two trained models, both with the move action and a move cost of 50, on the casters factory:
 
 | Orders (30 new seeds each) | Keep | Trained on the usual orders | Trained on varied orders |
@@ -20,13 +25,13 @@ Two trained models, both with the move action and a move cost of 50, on the cast
 - Early orders used to be impossible (the first Frame takes about 550 s). Orders can now have a notice time, and nothing is due before it.
 - A move cost of 50 in the reward cut changeovers from 203 to 46 per episode on varied orders, without losing profit.
 
-The model is no longer the main limit: on every order type it matches or beats an oracle planner that knows all orders in advance ([experiment 9](09-bottleneck-analysis.md)). With the usual orders, demand is the limit; with heavy orders, the constructors' iron bar and screw time. Use `scripts/ceiling.py` to see how close a model gets to the upper bound.
+The model is no longer the main limit: on every order type it matches or beats an oracle planner that knows all orders in advance ([experiment 9](09-bottleneck-analysis.md)). With the usual orders, demand is the limit; with heavy orders, the constructors' iron bar and screw time. Use `python -m sjfactory --scenario <file> check <model>` to see how close a model gets to the upper bound.
 
 ## Next steps
 
-1. Train the varied model longer (for example 3M steps; it was still improving at 1M) and make `scenarios/varied.yaml` the main training scenario. It is 10k behind the usual model on the usual orders.
-2. Report each run as a share of the upper bound (`scripts/ceiling.py`), not only against keep.
-3. For more profit, change the factory rather than the model: more constructors or a faster bar recipe; downstream machines first in line for inputs (today inputs go to machines in index order); storage costs so leftover parts count.
+1. Try factory ideas on the lab factory as variant files, comparing the share of the upper bound before and after with `check`: input priority for machines further down the line, storage costs, a slower or extra machine kind (a real bottleneck), more product types.
+2. Train on `lab-busy.yaml` or a mix of demand levels: the model leaves 4 points to the oracle when there are more orders than capacity.
+3. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
 4. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
 5. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
 
@@ -43,6 +48,7 @@ The model is no longer the main limit: on every order type it matches or beats a
 | 7 | [07-move-action-and-casters.md](07-move-action-and-casters.md) | Action becomes one move per kind; casters back | Same 118k, reached in less than half the steps, half the changeovers; casters learned fine |
 | 8 | [08-varied-orders.md](08-varied-orders.md) | Notice times, varied orders per episode, move cost | Beats keep on every order shape; 10k less on the usual one; move cost cuts switches 4 times |
 | 9 | [09-bottleneck-analysis.md](09-bottleneck-analysis.md) | Analysis: upper bound and oracle planner | Models match the oracle; limits are demand, then constructor time and batch flow |
+| 10 | [10-lab-factory.md](10-lab-factory.md) | Small balanced lab factory, variant files, `check` command | 4-minute training reaches 96% of the upper bound, level with the oracle |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

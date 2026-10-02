@@ -1,0 +1,7 @@
+# Variant of lab.yaml: more orders than the factory can make (about 400 units against at most 360), so the
+# plan must also choose which orders to leave short. Motors pay more than Frames.
+base: lab.yaml
+
+orders:
+  random:
+    count: [30, 50]

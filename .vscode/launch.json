@@ -59,6 +59,17 @@
             "presentation": { "group": "2 run", "order": 3 }
         },
         {
+            "name": "Check a scenario (load, keep, oracle, upper bound)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sjfactory",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--scenario", "${input:scenario}", "check"],
+            "presentation": { "group": "2 run", "order": 4 }
+        },
+        {
             "name": "Open all runs page",
             "type": "debugpy",
             "request": "launch",
@@ -129,6 +140,12 @@
             "description": "fixed: always the most likely choice; sampled: random draws from the model's probabilities",
             "options": ["fixed", "sampled"],
             "default": "fixed"
+        },
+        {
+            "id": "scenario",
+            "type": "promptString",
+            "description": "Scenario file to check",
+            "default": "scenarios/lab.yaml"
         },
         {
             "id": "runFolder",

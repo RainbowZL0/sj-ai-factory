@@ -1,0 +1,8 @@
+# Variant of lab-mixed.yaml: orders become known only 120 to 600 s before they are due (lab: 600 to 1800 s),
+# so the plan must react to new orders instead of dividing machine time far ahead. A unit takes at least 90 s
+# to make (30 s on each kind), so the shortest notice leaves little room. Roadmap milestone 5.
+base: lab-mixed.yaml
+
+orders:
+  random:
+    notice: [120, 600]

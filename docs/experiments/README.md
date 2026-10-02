@@ -57,6 +57,7 @@ See the [roadmap](../roadmap.md). The first step is a whole-order upper bound, s
 | 12 | [12-mixed-demand-and-three-products.md](12-mixed-demand-and-three-products.md) | Mixed demand; third product sharing plates across depths | Busy-day training is enough; machine order starves the line, the model works around it (93%), the oracle can't (53%) |
 | 13 | [13-yardsticks-and-penalties.md](13-yardsticks-and-penalties.md) | Look-ahead planner; strict penalties and order fines; order notice | Stricter penalties don't change priorities; the missed Motors cost only 1 to 2.5%; notice is generous |
 | 14 | [14-whole-orders-and-gamma.md](14-whole-orders-and-gamma.md) | Whole orders only, fine = full price; gamma 0.98 and 0.99 | Same behaviour; busy days are the weak spot (79% against the oracle's 87%); higher gamma worse at 500k |
+| 15 | [15-whole-order-bound-and-machine-time.md](15-whole-order-bound-and-machine-time.md) | Whole-order bound; where machine time goes; declining orders | Bound moves 0.2% at most, so the gap is real; the model loses by making products that never ship (10% of machine time, oracle 6%) |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

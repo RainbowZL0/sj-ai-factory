@@ -36,27 +36,25 @@ bound on the table on average.
 
 ## Milestones
 
-### 1. An honest yardstick (next)
+### 1. An honest yardstick (done, [experiment 15](experiments/15-whole-order-bound-and-machine-time.md))
 
-The upper bound in `check.py` lets an order ship in part even when the scenario ships whole orders only. On a
-busy day it then fills spare machine time with pieces of orders that in reality earn nothing, so the bound is
-too high exactly where the model looks weakest. We don't yet know how big the busy-day gap really is.
+The upper bound in `check.py` let an order ship in part even when the scenario ships whole orders only, so it
+might have been too high exactly where the model looks weakest. Now, with `partial_delivery: false`, each order
+is a yes/no choice in the bound.
 
-- Make the bound treat each order as yes or no when `partial_delivery: false` (an integer program with one
-  yes/no choice per order; machine time stays divisible, so it stays fast and stays a true bound).
-- Re-measure keep, the oracle and the best models on `lab`, `lab-busy`, `lab-mixed` and
-  `lab-three-downstream`.
+Result: the bound moves by 0.2% at most, because a fine for a short order is as big as its price, so filling
+part of an order almost never pays even on paper. The busy-day gap is real: model 79%, oracle 88%, and the
+oracle's own plan reaches 101% before it is played.
 
-Done when `check` prints the whole-order bound and the numbers above are redone with it.
+### 2. Where the busy-day money goes (done, [experiment 15](experiments/15-whole-order-bound-and-machine-time.md))
 
-### 2. Where the busy-day money goes
+`check` now shows where each policy's machine time went: work in units that shipped, in products left
+unsold, in other parts, changeovers, and waiting.
 
-Split each policy's loss on busy days into parts that point to different fixes:
-- **choice:** the orders it filled are worth less than the oracle's set;
-- **waste:** machine time spent on units that were never shipped (orders started and then missed);
-- **flow:** time lost to waiting, switching and batches, on the orders it did ship.
-
-Done when `check` prints this split and we know which part is largest.
+Result: the loss is **waste**, not choice of product or flow. The model keeps its machines as busy as the oracle,
+but 10% of all machine time ends in finished products nobody buys (oracle 6%): units for orders that then
+came up short. Declining orders on purpose does not help the oracle, so stock going to the wrong order is not
+the cause either. The model needs to see which orders still fit.
 
 ### 3. Close the busy-day gap
 
@@ -68,18 +66,21 @@ Try, cheapest first, and stop when the model reaches the oracle on `lab-busy`:
 4. If the model still can't learn the choice: a small solver picks the orders each minute and the model runs
    the line for them. Kept as its own policy, so pure model and solver-plus-model can be compared.
 
-### 4. One score for all kinds of days
+### 4. One score for all kinds of days (first version done)
 
-A single `check` run over a fixed set of days: light to busy (`lab-mixed`), shared materials
-(`lab-three-downstream`), and later short notice. It prints the share of the tightest bound per kind of day
-and on average, so one number says whether a change helped, and no kind of day gets worse unnoticed.
+`uv run python -m sjfactory bench [models ...]` runs `check` on a fixed set of days (`BENCH` in `check.py`):
+20 light-to-busy days (`lab-mixed`), 10 busy days (`lab-busy`) and 10 days of the three-product lab
+(`lab-three-downstream`). It prints each policy's share of the bound per kind of day, so no kind of day gets
+worse unnoticed. Short-notice days join it with milestone 5.
 
 ### 5. Reacting to the unexpected
 
 Today orders are known 10 to 30 times the time it takes to make them, so knowing every order in advance is
 worth almost nothing, and the oracle is a fair yardstick. Real factories get rush orders and breakdowns, and
 that is where a trained model should beat any planner that plans once.
-- Shorter notice (120 to 600 s), and show 30 orders instead of 20.
+- Shorter notice: `lab-short.yaml` (`lab-mixed` with notice 120 to 600 s). Without training: keep -17%,
+  oracle 84% of the bound, which it reaches only because it knows the orders before they are announced.
+  Also try showing 30 orders instead of 20.
 - Machine breakdowns (a new scenario setting whose default is none).
 - A fair yardstick for this: the look-ahead planner or the oracle re-planned each minute from the orders known
   so far.

@@ -41,6 +41,7 @@ On seeds 2000 to 2009, keep makes -2.9k and the oracle 109k (88% of the upper bo
 Variants (each a few lines on top of `lab.yaml`), each with a role in the [roadmap](../roadmap.md):
 - `lab-busy.yaml`: 30 to 50 orders, about 410 units against a capacity of 360, so the plan also has to choose which orders to leave short.
 - `lab-mixed.yaml`: 15 to 50 orders, from light days to more than the factory can make.
+- `lab-short.yaml`: `lab-mixed.yaml` with orders known only 120 to 600 s before they are due, to test reacting (roadmap milestone 5).
 - `lab-three.yaml`: a third product, Pump (1 Gear + 1 Plate + 1 Wire; a constructor makes a Gear from 2 Plates), on 4 smelters, 4 constructors and 3 assemblers. Plates go both to assemblers and to gear making, and in machine order the gear maker takes every plate, so keep ships nothing. `lab-three-downstream.yaml` is the same with `input_priority: downstream`.
 
 Variants used only by experiments 11 and 13 (storage costs, a single tight kind, stricter penalties, order fines) were removed on 2026-10-03 and are in git history. The settings they used (`storage_cost`, `order_fine`) still work.

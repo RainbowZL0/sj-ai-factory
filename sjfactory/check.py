@@ -7,7 +7,7 @@ uv run python -m sjfactory --scenario scenarios/lab.yaml check [runs/<folder>/be
   10 s periods; each machine kind's time in a period can be split freely over its recipes; a batch's inputs are
   taken in the period it runs and its outputs count floor(cycle / 10) periods later (a real batch never finishes
   sooner); no changeovers; every order known from the start. Every real schedule fits these rules, so no policy
-  can beat it. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
+  can beat it. Fines per order not filled in full are left out, which only makes the bound higher. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
   but no longer strict.
 - Look-ahead (sjfactory/lookahead.py): tries moves in a copy of the simulator each minute, so it sees
   batches and input order too. Knows every order in advance.
@@ -225,6 +225,13 @@ def play_plan(env: FactoryEnv, seed, plan) -> Recorder:
     return rec
 
 
+def _summary(rec: Recorder) -> dict:
+    """The episode summary plus units shipped per product"""
+    d = rec.deliveries_frame()
+    by_product = d.groupby("product")["shipped"].sum().to_dict() if not d.empty else {}
+    return {**rec.summary(), "by_product": {p: float(by_product.get(p, 0.0)) for p in rec.scenario.products}}
+
+
 def _check_seed(job) -> dict:
     scenario, horizon, models, seed, oracle_seconds, lookahead_minutes = job
     import torch
@@ -237,18 +244,18 @@ def _check_seed(job) -> dict:
     out["bound"] = bound(env)
     if oracle_seconds > 0:
         out["oracle planned"], plan, _ = oracle(env, time_limit=oracle_seconds)
-        out["oracle"] = play_plan(env, seed, plan).summary()
-    out["keep"] = run_episode(env, baseline_policy("keep", env), seed=seed).summary()
+        out["oracle"] = _summary(play_plan(env, seed, plan))
+    out["keep"] = _summary(run_episode(env, baseline_policy("keep", env), seed=seed))
     if lookahead_minutes > 0:
         from sjfactory.lookahead import LookaheadPolicy
 
-        out["look-ahead"] = run_episode(env, LookaheadPolicy(env, lookahead_minutes), seed=seed).summary()
+        out["look-ahead"] = _summary(run_episode(env, LookaheadPolicy(env, lookahead_minutes), seed=seed))
     if models:
         from sb3_contrib import MaskablePPO
 
         for path in models:
             model = MaskablePPO.load(path, device="cpu")
-            out[path] = model_episodes(env, model, [seed], "fixed")[0].summary()
+            out[path] = _summary(model_episodes(env, model, [seed], "fixed")[0])
     return out
 
 
@@ -286,15 +293,17 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
     rows = ["keep", *models] + (["look-ahead"] if lookahead_minutes > 0 else []) + (["oracle"] if oracle_seconds > 0 else [])
     b = float(np.mean([r["bound"] for r in res]))
     summary = {"seeds": seeds, "demand": demand, "need": need, "bound": b}
-    print(f"\nMean over {len(seeds)} episodes{'':30s}{'profit':>10s}{'of bound':>10s}{'shipped':>10s}{'busy':>8s}")
+    print(f"\nMean over {len(seeds)} episodes{'':30s}{'profit':>10s}{'of bound':>10s}{'shipped':>10s}{'busy':>8s}   units shipped")
     for key in rows:
         s = [r[key] for r in res]
         profit = float(np.mean([x["profit"] for x in s]))
         fill = float(np.mean([x["fill_rate"] for x in s]))
         busy = float(np.mean([x["machine_busy_ratio"] for x in s]))
-        summary[key] = {"profit": profit, "fill_rate": fill, "busy": busy}
+        units = {p: float(np.mean([x["by_product"][p] for x in s])) for p in sc.products}
+        summary[key] = {"profit": profit, "fill_rate": fill, "busy": busy, "units": units}
         label = key if len(key) <= 50 else "..." + key[-47:]
-        print(f"  {label:50s}{profit:10,.0f}{profit / b if b > 0 else float('nan'):10.0%}{fill:10.0%}{busy:8.0%}")
+        print(f"  {label:50s}{profit:10,.0f}{profit / b if b > 0 else float('nan'):10.0%}{fill:10.0%}{busy:8.0%}"
+              + "   " + ", ".join(f"{p} {u:.0f}" for p, u in units.items()))
     if oracle_seconds > 0:
         # What the oracle expected: the gap to "oracle" is lost to flow within a minute (batches, waiting for inputs)
         planned = float(np.mean([r["oracle planned"] for r in res]))

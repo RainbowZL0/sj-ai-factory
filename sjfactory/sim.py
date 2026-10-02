@@ -74,6 +74,7 @@ class FactorySim:
         self.sell_price = np.array([m.sell_price for m in sc.materials], dtype=float)
         self.storage_cost = np.array([m.storage_cost for m in sc.materials], dtype=float)
         self.shortfall_penalty = np.array([m.shortfall_penalty for m in sc.materials], dtype=float)
+        self.order_fine = np.array([m.order_fine for m in sc.materials], dtype=float)
 
         # Sort key per recipe for handing out inputs (lower goes first); None keeps machine order
         self.input_rank = -np.array(sc.recipe_depth) if sc.input_priority == "downstream" else None
@@ -202,7 +203,8 @@ class FactorySim:
                     order=o,
                     shipped=float(shipped),
                     revenue=float(shipped * self.sell_price[i]),
-                    penalty=float((o.quantity - shipped) * self.shortfall_penalty[i]),
+                    penalty=float((o.quantity - shipped) * self.shortfall_penalty[i])
+                    + (float(self.order_fine[i]) if shipped < o.quantity else 0.0),
                 )
             )
 

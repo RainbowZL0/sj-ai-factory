@@ -23,6 +23,7 @@ class Material:
     sell_price: float = 0.0  # income per unit when an order is delivered
     storage_cost: float = 0.0  # cost per unit per second
     shortfall_penalty: float = 0.0  # fine per unit missing when an order is due
+    order_fine: float = 0.0  # extra fine per order of this material that is not filled in full when due
 
 
 @dataclass(frozen=True)

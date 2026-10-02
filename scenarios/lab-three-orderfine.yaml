@@ -1,0 +1,8 @@
+# Variant of lab-three-downstream.yaml with a fine of 3,000 for every order not filled in full, on top of the
+# usual penalty per missing unit. A plan that finishes whole orders now beats one that spreads units thinly.
+base: lab-three-downstream.yaml
+
+materials:
+  Motor: {order_fine: 3000}
+  Frame: {order_fine: 3000}
+  Pump: {order_fine: 3000}

@@ -347,3 +347,10 @@ def test_lookahead_tries_do_not_change_the_episode():
     again = run_episode(env, LookaheadPolicy(env, 5), seed=3)
     assert len(first.reports) == 1200  # the recording holds the real seconds only, not the tries
     assert first.summary() == again.summary()
+
+
+def test_order_fine_applies_once_per_short_order():
+    sim = FactorySim(scenario_from_dict({**TINY, "materials": {**TINY["materials"], "B": {**TINY["materials"]["B"], "order_fine": 50}}}))
+    sim.reset(seed=0)
+    reports = [sim.step() for _ in range(5)]
+    assert reports[-1].deliveries[0].penalty == 4 + 50  # 1 unit short × 4, plus the fine for the order

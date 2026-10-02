@@ -8,7 +8,7 @@
 2. **Start batches.** Every idle machine that has a recipe starts if the stock covers the inputs. Inputs are taken now. Machines are served in list order, or with `input_priority: downstream` the machines whose recipe is furthest from the raw materials first (`Scenario.recipe_depth`), then in list order.
 3. **Use power.** Running machines use `power_kw × 1 s` of energy.
 4. **Advance one second.** Changeovers count down. Batches that reach zero put their outputs into stock.
-5. **Settle due orders.** Orders whose due time has arrived ship whatever stock exists. Missing units cost `shortfall_penalty` each.
+5. **Settle due orders.** Orders whose due time has arrived ship whatever stock exists. Missing units cost `shortfall_penalty` each, plus `order_fine` once per order not filled in full.
 6. **Settle cash.** Cash changes by revenue − penalty − energy − storage − rent.
 
 All machines share one warehouse, so the scenario needs no links between machines. The real connections are the material flow chart (`material_flow.png`), drawn from the recipes.
@@ -41,6 +41,7 @@ Variants (each a few lines on top of `lab.yaml`):
 - `lab-storage.yaml`: storage costs on every part and product (0.01 to 0.05 per unit per second), so parts made too early cost profit.
 - `lab-bottleneck.yaml`: 4 smelters and 4 constructors, so only the assemblers are tight.
 - `lab-mixed.yaml`: 15 to 50 orders, from light days to more than the factory can make.
+- `lab-three-strict.yaml` and `lab-three-orderfine.yaml`: `lab-three-downstream.yaml` with penalties twice the price, or a fine of 3,000 per order not filled in full (material field `order_fine`).
 - `lab-three.yaml`: a third product, Pump (1 Gear + 1 Plate + 1 Wire; a constructor makes a Gear from 2 Plates), on 4 smelters, 4 constructors and 3 assemblers. Plates go both to assemblers and to gear making, and in machine order the gear maker takes every plate, so keep ships nothing. `lab-three-downstream.yaml` is the same with `input_priority: downstream`.
 
 `casters-downstream.yaml` is the larger casters factory with `input_priority: downstream`.

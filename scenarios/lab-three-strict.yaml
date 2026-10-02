@@ -1,0 +1,8 @@
+# Variant of lab-three-downstream.yaml with penalties twice as strict: each missing unit costs twice its price
+# (normally half). Products keep the same value relative to each other.
+base: lab-three-downstream.yaml
+
+materials:
+  Motor: {shortfall_penalty: 1200}
+  Frame: {shortfall_penalty: 800}
+  Pump: {shortfall_penalty: 1600}

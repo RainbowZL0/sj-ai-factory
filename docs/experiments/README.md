@@ -12,6 +12,8 @@ First ideas tried ([experiment 11](11-lab-variants.md)): serving machines furthe
 
 With a third product whose gear maker shares plates with the assemblers ([experiment 12](12-mixed-demand-and-three-products.md)), machine order starves the line: keep ships nothing and the oracle's played plan reaches only 53% of the bound. The model works around it (93%); with downstream priority, 95%. Compare against the upper bound; the oracle is only a fair yardstick when flow within a minute is smooth.
 
+Stricter penalties, per unit or per order, don't change which product gets the machines ([experiment 13](13-yardsticks-and-penalties.md)): all models ship the same mix. Product priority is a weak signal because each product displaces another on a busy machine, so the gain is only the difference in value. Order notice is generous (10 to 30 times the time to make a product). A look-ahead planner in the real simulator is now in `check`, but it is weaker than the models.
+
 The rest of this section is about the larger factory of experiments 1 to 9 (`casters.yaml`, `varied.yaml`).
 
 
@@ -33,8 +35,8 @@ The model is no longer the main limit: on every order type it matches or beats a
 
 ## Next steps
 
-1. Make `input_priority: downstream` the default for new scenarios: it never hurt and fixes starvation. Old scenarios keep machine order so old results repeat.
-2. Make the oracle aware of input order, or replace it with a short look-ahead planner run in the simulator, so it stays a fair yardstick when the line can starve.
+1. Shorter notice (for example 120 to 600 s) to test reacting, not just dividing machine time; show 30 orders instead of 20.
+2. Break ties in input priority: machines that make a product first, then those that make parts (under keep, `lab-three-downstream.yaml` ships no Frames).
 3. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).
 4. Harder lab variants that need planning: machine breakdowns, or a machine kind that can only run some recipes.
 5. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
@@ -57,6 +59,7 @@ The model is no longer the main limit: on every order type it matches or beats a
 | 10 | [10-lab-factory.md](10-lab-factory.md) | Small balanced lab factory, variant files, `check` command | 4-minute training reaches 96% of the upper bound, level with the oracle |
 | 11 | [11-lab-variants.md](11-lab-variants.md) | Input priority, storage costs, one tight kind, more orders than capacity | Priority changes nothing; spare time upstream helps; training on busy orders gives the best model |
 | 12 | [12-mixed-demand-and-three-products.md](12-mixed-demand-and-three-products.md) | Mixed demand; third product sharing plates across depths | Busy-day training is enough; machine order starves the line, the model works around it (93%), the oracle can't (53%) |
+| 13 | [13-yardsticks-and-penalties.md](13-yardsticks-and-penalties.md) | Look-ahead planner; strict penalties and order fines; order notice | Stricter penalties don't change priorities; the missed Motors cost only 1 to 2.5%; notice is generous |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

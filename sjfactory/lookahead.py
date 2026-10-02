@@ -68,7 +68,7 @@ class LookaheadPolicy:
         env, s = self.env, self.env.sim.state
         state = dataclasses.replace(
             s, stock=s.stock.copy(), recipe=s.recipe.copy(), remaining=s.remaining.copy(), setup=s.setup.copy(),
-            orders=list(s.orders),
+            orders=list(s.orders), down=s.down.copy(), failures=list(s.failures),
         )
         return state, [p.copy() for p in env.plan], set(env._unreached)
 
@@ -76,7 +76,7 @@ class LookaheadPolicy:
         state, plan, unreached = saved
         self.env.sim.state = dataclasses.replace(
             state, stock=state.stock.copy(), recipe=state.recipe.copy(), remaining=state.remaining.copy(),
-            setup=state.setup.copy(), orders=list(state.orders),
+            setup=state.setup.copy(), orders=list(state.orders), down=state.down.copy(), failures=list(state.failures),
         )
         self.env.plan = [p.copy() for p in plan]
         self.env._unreached = set(unreached)

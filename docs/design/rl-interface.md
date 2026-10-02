@@ -35,6 +35,7 @@ One flat vector, all squeezed to small values:
 - per machine: its recipe (one‑hot, meaning a row of zeros with a single 1), the fraction of its batch left, the fraction of its changeover left, and whether it is waiting for inputs
 - units still ordered per product, over all known orders
 - the 20 known orders due soonest: product, quantity and time until due. Orders not yet known (see `notice` in [simulation.md](simulation.md)) are hidden.
+- only in scenarios with breakdowns: per machine, the repair time left (divided by the longest possible).
 - optional (`train --order-slack`, saved in the run's `config.json`, so `check` and `eval` set it up again for that model): for each of those orders, the time to spare at its due time if the factory makes it and the earlier orders that fit, from the finished products in stock, with every machine kind at full speed. Negative means the order doesn't fit; it is then left out for the later orders, since the factory will miss it anyway. It is a rough guide (it ignores parts in stock, waiting and changeovers) that saves the model from adding up orders itself (roadmap milestone 3).
 
 Prices and other constants are left out because they never change within a scenario; cash is left out because it does not change what the best decision is.

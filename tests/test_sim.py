@@ -418,6 +418,25 @@ def test_replanned_oracle_plays_a_whole_episode():
         assert play_replanned(env, 2000, every=5, time_limit=10, known_only=known).summary()["seconds"] == 1200
 
 
+def test_a_broken_machine_pauses_its_batch_and_resumes():
+    sim = FactorySim(scenario_from_dict(TINY))
+    sim.reset(seed=0)
+    sim.state.failures = [(1, 0, 3)]  # breaks down at second 1, out for 3 s
+    reports = [sim.step() for _ in range(6)]
+    assert [r.running[0] for r in reports] == [0, STOP, STOP, STOP, 0, 0]
+    # the 2 s batch finished at second 5 instead of 2, just in time for the order due then
+    assert reports[4].deliveries[0].shipped == 1
+
+
+def test_breakdowns_do_not_change_the_orders():
+    lab = load_scenario(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml")
+    broken = load_scenario(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml")
+    a, b = FactorySim(lab), FactorySim(broken)
+    a.reset(seed=5)
+    b.reset(seed=5)
+    assert a.state.orders == b.state.orders and a.state.failures == [] and len(b.state.failures) > 0
+
+
 def test_machine_time_split_adds_up():
     from sjfactory.check import time_split
     from sjfactory.evaluate import run_episode

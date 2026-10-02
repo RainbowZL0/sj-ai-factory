@@ -4,6 +4,7 @@
 
 `FactorySim.step(changes)` does these steps in this order:
 
+0. **Breakdowns.** Only with a `breakdowns` setting (`per_hour`, `duration: [low, high]` in seconds). Breakdown times are drawn at `reset()` from their own random stream, so the orders of a seed don't change. A broken machine does nothing until repaired: its batch and changeover pause, it uses no power, and it can't switch recipe. Without the setting nothing ever breaks, as before.
 1. **Switch recipes.** Only idle machines (no batch running, no changeover going on) can switch. Asking a busy machine to switch is an error, because it would mean the caller has a bug. Switching to a different recipe starts a changeover of `changeover_time` seconds, during which the machine makes nothing and uses no power. Stopping needs no changeover; starting again after a stop does.
 2. **Start batches.** Every idle machine that has a recipe starts if the stock covers the inputs. Inputs are taken now. Machines are served in list order, or with `input_priority: downstream` the machines whose recipe is furthest from the raw materials first (`Scenario.recipe_depth`), then in list order.
 3. **Use power.** Running machines use `power_kw × 1 s` of energy.
@@ -41,6 +42,7 @@ On seeds 2000 to 2009, keep makes -2.9k and the oracle 109k (88% of the upper bo
 Variants (each a few lines on top of `lab.yaml`), each with a role in the [roadmap](../roadmap.md):
 - `lab-busy.yaml`: 30 to 50 orders, about 410 units against a capacity of 360, so the plan also has to choose which orders to leave short.
 - `lab-mixed.yaml`: 15 to 50 orders, from light days to more than the factory can make.
+- `lab-breakdowns.yaml`: `lab-mixed.yaml` with breakdowns: each machine fails about twice an hour, for 1 to 5 minutes (about 10% of machine time).
 - `lab-short.yaml`: `lab-mixed.yaml` with orders known only 120 to 600 s before they are due, to test reacting (roadmap milestone 5).
 - `lab-three.yaml`: a third product, Pump (1 Gear + 1 Plate + 1 Wire; a constructor makes a Gear from 2 Plates), on 4 smelters, 4 constructors and 3 assemblers. Plates go both to assemblers and to gear making, and in machine order the gear maker takes every plate, so keep ships nothing. `lab-three-downstream.yaml` is the same with `input_priority: downstream`.
 
@@ -87,6 +89,5 @@ These settings are optional in any scenario; without them orders are drawn exact
 ## Not modelled yet
 
 - Buying raw materials.
-- Machine breakdowns.
 
 Each would be a field in `spec.py` plus a few lines in `FactorySim.step`.

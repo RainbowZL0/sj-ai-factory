@@ -118,6 +118,7 @@ class FactoryEnv(gym.Env):
             + 2 * len(sc.materials)  # stock: log scale, and in batches
             + 2 * len(self.slot_recipe)  # per slot: machines on that recipe now, and planned
             + self.sim.n_machines * (n_rcp + 4)  # recipe (including stop), batch left, changeover left, waiting for inputs
+            + self.sim.n_machines * (sc.breakdowns is not None)  # repair time left, only if machines can break down
             + len(sc.products)  # units still ordered per product, over all known orders
             + visible_orders * (len(sc.products) + 2 + order_slack)  # product, quantity, time until due, [slack]
         )
@@ -234,6 +235,7 @@ class FactoryEnv(gym.Env):
                 now / self.slot_size,
                 planned / self.slot_size,
                 np.column_stack([recipe_onehot, progress, setup, waiting]).ravel(),
+                s.down / sc.breakdowns.duration_range[1] if sc.breakdowns else np.zeros(0),
                 _squash(demand),
                 orders.ravel(),
             ]

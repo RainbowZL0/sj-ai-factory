@@ -412,6 +412,8 @@ BENCH = (
     ("scenarios/lab-mixed.yaml", "light to busy", range(2000, 2030)),
     ("scenarios/lab-busy.yaml", "busy", range(2000, 2030)),
     ("scenarios/lab-three-downstream.yaml", "third product", range(2000, 2030)),
+    ("scenarios/lab-short.yaml", "short notice", range(2000, 2030)),
+    ("scenarios/lab-breakdowns.yaml", "breakdowns", range(2000, 2030)),
 )
 
 

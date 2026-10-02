@@ -72,6 +72,16 @@ class RandomOrders:
 
 
 @dataclass(frozen=True)
+class Breakdowns:
+    """Machines that break down at random: each machine fails on average per_hour times an hour, at times drawn
+    from the random seed at reset, and is then out for a number of seconds drawn from duration_range. A broken
+    machine does nothing: its batch or changeover pauses, it uses no power and it can't switch recipe."""
+
+    per_hour: float
+    duration_range: tuple[int, int]  # seconds out of action; both ends included
+
+
+@dataclass(frozen=True)
 class Scenario:
     horizon: int  # seconds per episode
     initial_cash: float
@@ -89,6 +99,8 @@ class Scenario:
     # True: a due order ships whatever stock exists and is paid per unit shipped. False: it ships only if the full
     # quantity is in stock; otherwise nothing ships, nothing is paid and every unit of the order is fined.
     partial_delivery: bool = True
+    # None: machines never break down, as before
+    breakdowns: Breakdowns | None = None
 
     def __post_init__(self):
         self._validate()
@@ -164,6 +176,8 @@ class Scenario:
             raise ValueError("horizon must be at least 1")
         if self.changeover_time < 0:
             raise ValueError("changeover_time must not be negative")
+        if self.breakdowns and (self.breakdowns.per_hour < 0 or self.breakdowns.duration_range[0] < 1):
+            raise ValueError("breakdowns: per_hour must not be negative and durations must be at least 1 s")
         if self.input_priority not in ("machine_order", "downstream"):
             raise ValueError(f"input_priority must be machine_order or downstream, not {self.input_priority}")
 
@@ -281,6 +295,11 @@ def scenario_from_dict(d: dict[str, Any]) -> Scenario:
         changeover_time=int(d.get("changeover_time", 0)),
         input_priority=d.get("input_priority", "machine_order"),
         partial_delivery=bool(d.get("partial_delivery", True)),
+        breakdowns=(
+            Breakdowns(per_hour=float(d["breakdowns"]["per_hour"]), duration_range=_int_range(d["breakdowns"]["duration"]))
+            if d.get("breakdowns")
+            else None
+        ),
         materials=materials,
         recipes=recipes,
         machines=_expand_machines(d["machines"]),

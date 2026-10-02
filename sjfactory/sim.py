@@ -26,6 +26,8 @@ class State:
     remaining: np.ndarray  # [machine], seconds left in the current batch, 0 means no batch
     setup: np.ndarray  # [machine], seconds left in a recipe changeover; a machine in changeover makes nothing
     orders: list[Order]  # orders not yet delivered, sorted by due time
+    down: np.ndarray  # [machine], seconds left broken down; a broken machine does nothing
+    failures: list[tuple[int, int, int]]  # breakdowns still to come: (time, machine, seconds out), sorted by time
 
 
 @dataclass(frozen=True)
@@ -108,8 +110,23 @@ class FactorySim:
             remaining=np.zeros(self.n_machines, dtype=int),
             setup=np.zeros(self.n_machines, dtype=int),
             orders=orders,
+            down=np.zeros(self.n_machines, dtype=int),
+            failures=self._failures(seed),
         )
         return self.state
+
+    def _failures(self, seed: int | None) -> list[tuple[int, int, int]]:
+        """Breakdown times for the episode, from their own random stream so the orders don't change"""
+        spec = self.scenario.breakdowns
+        if spec is None or spec.per_hour == 0:
+            return []
+        rng = np.random.default_rng(None if seed is None else [seed, 1])
+        failures = []
+        for m in range(self.n_machines):
+            for _ in range(rng.poisson(spec.per_hour * self.scenario.horizon / 3600)):
+                at = int(rng.integers(0, self.scenario.horizon))
+                failures.append((at, m, int(rng.integers(spec.duration_range[0], spec.duration_range[1] + 1))))
+        return sorted(failures)
 
     def _random_orders(self, rng: np.random.Generator) -> list[Order]:
         spec = self.scenario.random_orders
@@ -147,8 +164,9 @@ class FactorySim:
 
     @property
     def idle(self) -> np.ndarray:
-        """[machine] True if the machine is neither running a batch nor in a changeover, so it may switch recipe"""
-        return (self.state.remaining == 0) & (self.state.setup == 0)
+        """[machine] True if the machine is not running a batch, not in a changeover and not broken, so it may
+        switch recipe"""
+        return (self.state.remaining == 0) & (self.state.setup == 0) & (self.state.down == 0)
 
     @property
     def done(self) -> bool:
@@ -161,6 +179,12 @@ class FactorySim:
             Machines not listed keep their recipe: when idle, they start as soon as inputs are in stock.
         """
         s, sc = self.state, self.scenario
+
+        # 0. Machines due to break down stop now (a breakdown on a broken machine makes it last longer)
+        while s.failures and s.failures[0][0] <= s.clock:
+            _, m, seconds = s.failures.pop(0)
+            s.down[m] = max(s.down[m], seconds)
+        working = s.down == 0
 
         # 1. Switch recipes: only idle machines can switch. A different recipe needs a changeover first
         idle = self.idle
@@ -187,12 +211,13 @@ class FactorySim:
                     s.stock -= n
                     s.remaining[m] = self.cycle_time[s.recipe[m]]
 
-        running = s.remaining > 0
+        running = (s.remaining > 0) & working
         running_recipe = np.where(running, s.recipe, STOP)
         energy_kwh = float(self.power_kw[s.recipe[running]].sum()) / 3600
 
         # 3. Advance 1 second; changeovers count down; finished batches go into stock
-        s.setup[s.setup > 0] -= 1
+        s.setup[(s.setup > 0) & working] -= 1
+        s.down[~working] -= 1
         s.remaining[running] -= 1
         for m in np.flatnonzero(running & (s.remaining == 0)):
             s.stock += self.recipe_out[s.recipe[m]]

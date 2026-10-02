@@ -1,0 +1,29 @@
+# Variant of lab.yaml with a third product, so planning is harder and loads are uneven:
+#   Constructor  2 Plate -> Gear                         10 s
+#   Assembler    1 Gear + 1 Plate + 1 Wire -> Pump       30 s
+# A Pump needs 40 s of smelter time, 50 s of constructor time and 30 s of assembler time. Plates now go both
+# to assemblers and to gear making, a step earlier, so who gets plates first matters.
+base: lab.yaml
+
+materials:
+  Gear: {}
+  Pump: {sell_price: 800, shortfall_penalty: 400}
+
+recipes:
+  Make_Gear: {category: Constructor, cycle_time: 10, power_kw: 15, inputs: {Plate: 2}, outputs: {Gear: 1}}
+  Make_Pump: {category: Assembler, cycle_time: 30, power_kw: 20, inputs: {Gear: 1, Plate: 1, Wire: 1}, outputs: {Pump: 1}}
+
+machines:
+  - {category: Smelter, recipe: Smelt_Iron, count: 3}
+  - {category: Smelter, recipe: Smelt_Copper, count: 1}
+  - {category: Constructor, recipe: Make_Plate, count: 2}
+  - {category: Constructor, recipe: Make_Wire, count: 1}
+  - {category: Constructor, recipe: Make_Gear, count: 1}
+  - {category: Assembler, recipe: Make_Frame, count: 1}
+  - {category: Assembler, recipe: Make_Motor, count: 1}
+  - {category: Assembler, recipe: Make_Pump, count: 1}
+
+orders:
+  random:
+    count: [18, 36]
+    products: [Motor, Frame, Pump]

@@ -10,6 +10,8 @@ All profits are the mean over test seeds 1000, 1001 and 1002 (the same orders ev
 
 First ideas tried ([experiment 11](11-lab-variants.md)): serving machines further down the line first changes nothing; spare time before the bottleneck lifts the oracle to 100% of the bound; storage costs hurt keep but not a model. The model trained on more orders than capacity (`lab-busy.yaml`) is the best on every lab scenario.
 
+With a third product whose gear maker shares plates with the assemblers ([experiment 12](12-mixed-demand-and-three-products.md)), machine order starves the line: keep ships nothing and the oracle's played plan reaches only 53% of the bound. The model works around it (93%); with downstream priority, 95%. Compare against the upper bound; the oracle is only a fair yardstick when flow within a minute is smooth.
+
 The rest of this section is about the larger factory of experiments 1 to 9 (`casters.yaml`, `varied.yaml`).
 
 
@@ -31,12 +33,13 @@ The model is no longer the main limit: on every order type it matches or beats a
 
 ## Next steps
 
-1. Train on a mix of demand levels (order count drawn from a wider range, for example 15 to 50), so one model covers both normal and busy days.
-2. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).
-3. Make the lab harder in ways that need planning: a third product, a material shared between recipes at different depths, or a machine kind that can only run some recipes.
-4. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
-5. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
-6. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
+1. Make `input_priority: downstream` the default for new scenarios: it never hurt and fixes starvation. Old scenarios keep machine order so old results repeat.
+2. Make the oracle aware of input order, or replace it with a short look-ahead planner run in the simulator, so it stays a fair yardstick when the line can starve.
+3. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).
+4. Harder lab variants that need planning: machine breakdowns, or a machine kind that can only run some recipes.
+5. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
+6. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
+7. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
 
 ## Experiments
 
@@ -53,6 +56,7 @@ The model is no longer the main limit: on every order type it matches or beats a
 | 9 | [09-bottleneck-analysis.md](09-bottleneck-analysis.md) | Analysis: upper bound and oracle planner | Models match the oracle; limits are demand, then constructor time and batch flow |
 | 10 | [10-lab-factory.md](10-lab-factory.md) | Small balanced lab factory, variant files, `check` command | 4-minute training reaches 96% of the upper bound, level with the oracle |
 | 11 | [11-lab-variants.md](11-lab-variants.md) | Input priority, storage costs, one tight kind, more orders than capacity | Priority changes nothing; spare time upstream helps; training on busy orders gives the best model |
+| 12 | [12-mixed-demand-and-three-products.md](12-mixed-demand-and-three-products.md) | Mixed demand; third product sharing plates across depths | Busy-day training is enough; machine order starves the line, the model works around it (93%), the oracle can't (53%) |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

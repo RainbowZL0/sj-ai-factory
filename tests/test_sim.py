@@ -327,3 +327,12 @@ def test_downstream_priority_serves_deeper_recipes_first():
         sim.reset(seed=0)
         sim.step()
         assert (sim.state.remaining > 0).astype(int).tolist() == started, priority
+
+
+def test_three_product_lab_loads_with_its_variant_chain():
+    from sjfactory.check import unit_load
+
+    sc = load_scenario(PROJECT_ROOT / "scenarios" / "lab-three-downstream.yaml")
+    assert sc.input_priority == "downstream" and sc.products == ("Motor", "Frame", "Pump")
+    assert unit_load(sc)["Pump"] == {"Assembler": 30.0, "Constructor": 50.0, "Smelter": 40.0}
+    assert sc.random_orders.notice_range == (600, 1800)  # from lab.yaml, two files up

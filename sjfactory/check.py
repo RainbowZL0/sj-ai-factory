@@ -234,7 +234,7 @@ def _check_seed(job) -> dict:
     out = {"demand": {p: sum(o.quantity for o in env.sim.state.orders if o.product == p) for p in sc.products}}
     out["bound"] = bound(env)
     if oracle_seconds > 0:
-        _, plan, _ = oracle(env, time_limit=oracle_seconds)
+        out["oracle planned"], plan, _ = oracle(env, time_limit=oracle_seconds)
         out["oracle"] = play_plan(env, seed, plan).summary()
     out["keep"] = run_episode(env, baseline_policy("keep", env), seed=seed).summary()
     if models:
@@ -288,5 +288,10 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
         summary[key] = {"profit": profit, "fill_rate": fill, "busy": busy}
         label = key if len(key) <= 50 else "..." + key[-47:]
         print(f"  {label:50s}{profit:10,.0f}{profit / b if b > 0 else float('nan'):10.0%}{fill:10.0%}{busy:8.0%}")
+    if oracle_seconds > 0:
+        # What the oracle expected: the gap to "oracle" is lost to flow within a minute (batches, waiting for inputs)
+        planned = float(np.mean([r["oracle planned"] for r in res]))
+        summary["oracle planned"] = planned
+        print(f"  {'oracle, as planned':50s}{planned:10,.0f}{planned / b if b > 0 else float('nan'):10.0%}")
     print(f"  {'upper bound':50s}{b:10,.0f}")
     return summary

@@ -1,0 +1,7 @@
+# Variant of lab.yaml: demand level drawn per episode, from light days (15 orders, about 150 units) to days with
+# more orders than the factory can make (50 orders, about 500 units against a capacity of 360).
+base: lab.yaml
+
+orders:
+  random:
+    count: [15, 50]

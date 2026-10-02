@@ -53,6 +53,21 @@ def model_episodes(env: FactoryEnv, model, seeds: Iterable[int], mode: str) -> l
     return recs
 
 
+MODEL_ENV_OPTIONS = ("order_slack",)  # env settings that change what a model sees, saved in its run's config.json
+
+
+def model_env_options(model_path) -> dict:
+    """The env settings a saved model was trained with, read from config.json in its run folder"""
+    import json
+    from pathlib import Path
+
+    config = Path(model_path).parent / "config.json"
+    if not config.exists():
+        return {}
+    saved = json.loads(config.read_text(encoding="utf-8"))
+    return {k: saved[k] for k in MODEL_ENV_OPTIONS if k in saved}
+
+
 def cash_curve(rec: Recorder, max_points=1000) -> dict:
     """Cash over time, thinned to at most max_points so pages stay small"""
     t, cash = rec.time, np.asarray(rec.cash)

@@ -7,14 +7,17 @@ uv run python -m sjfactory --scenario scenarios/lab.yaml check [runs/<folder>/be
   10 s periods; each machine kind's time in a period can be split freely over its recipes; a batch's inputs are
   taken in the period it runs and its outputs count floor(cycle / 10) periods later (a real batch never finishes
   sooner); no changeovers; every order known from the start. Every real schedule fits these rules, so no policy
-  can beat it. Without partial delivery the bound may still fill orders in part, which only makes it higher.
-  Fines per order not filled in full are left out, which only makes the bound higher. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
+  can beat it. Without partial delivery each order is a yes/no choice (an integer program, still well under a
+  second), and fines per order not filled in full are counted; with partial delivery they are left out, which
+  only makes the bound higher. Storage is charged on the stock at the end of each period, so with storage costs the bound is close
   but no longer strict.
 - Look-ahead (sjfactory/lookahead.py): tries moves in a copy of the simulator each minute, so it sees
   batches and input order too. Knows every order in advance.
 - Oracle (integer program): the model's own kind of decision, whole machines per recipe each minute, with a
   changeover per machine added, but knowing every order in advance. Its plan is played in the simulator.
   Not a strict bound: flow within a minute is treated as smooth, so the plan loses some profit when played.
+- Machine time: where each policy's machine time went (work in shipped units, in products left unsold, in
+  other parts, changeovers, waiting). Only the first earns money.
 """
 
 from __future__ import annotations
@@ -29,46 +32,21 @@ import scipy.sparse as sp
 from scipy.optimize import Bounds, LinearConstraint, linprog, milp
 
 from sjfactory.env import FactoryEnv
-from sjfactory.evaluate import baseline_policy, model_episodes, run_episode
+from sjfactory.evaluate import baseline_policy, model_env_options, model_episodes, run_episode
 from sjfactory.policies import KeepPolicy
 from sjfactory.recorder import Recorder
-from sjfactory.spec import Scenario
+from sjfactory.sim import STOP
+from sjfactory.spec import Scenario, unit_load  # noqa: F401  (unit_load is used here and by tests)
 
 L = 10  # seconds per period in the upper bound
 P = 60  # seconds per period in the oracle, the same as one decision
 
 
-def unit_load(sc: Scenario) -> dict[str, dict[str, float]]:
-    """{product: {machine kind: machine seconds per unit}}, following the first runnable recipe that makes each
-    material back to materials no runnable recipe makes (those count as raw)"""
-    maker = {}
-    for i, r in enumerate(sc.recipes):
-        if sc.can_ever_run(i):
-            for name in r.outputs:
-                maker.setdefault(name, r)
-    load = {}
-    for product in sc.products:
-        seconds: dict[str, float] = {}
-
-        def add(name: str, qty: float, depth=0):
-            r = maker.get(name)
-            if r is None:
-                return
-            if depth > len(sc.recipes):
-                raise ValueError(f"recipes for {name} go round in a circle")
-            batches = qty / r.outputs[name]
-            seconds[r.category] = seconds.get(r.category, 0.0) + batches * r.cycle_time
-            for inp, q in r.inputs.items():
-                add(inp, batches * q, depth + 1)
-
-        add(product, 1.0)
-        load[product] = seconds
-    return load
-
-
-def bound(env: FactoryEnv) -> float:
-    """Upper bound on the profit of the episode just reset in env"""
+def bound(env: FactoryEnv, whole_orders: bool | None = None) -> float:
+    """Upper bound on the profit of the episode just reset in env. With whole_orders (the default when the
+    scenario has no partial delivery) each order is a yes/no choice, which makes the bound tighter"""
     sim, sc = env.sim, env.sim.scenario
+    whole = not sc.partial_delivery if whole_orders is None else whole_orders
     orders = sim.state.orders
     R, M = len(sc.recipes), len(sc.materials)
     T = -(-sc.horizon // L)
@@ -109,17 +87,33 @@ def bound(env: FactoryEnv) -> float:
                 if sim.recipe_in[r, m] > 0:
                     erows.append(erow); ecols.append(xi(t, r)); evals.append(sim.recipe_in[r, m] / sim.cycle_time[r])
             erhs.append(init[m] if t == 0 else 0.0); erow += 1
+    # Order variables: units shipped, or with whole orders 1 if the order is filled in full (it ships its quantity)
+    qty = np.array([o.quantity for o in orders], dtype=float)
     for i in range(no):
-        erows.append(o_period[i] * M + o_mat[i]); ecols.append(si(i)); evals.append(1.0)
+        erows.append(o_period[i] * M + o_mat[i]); ecols.append(si(i)); evals.append(qty[i] if whole else 1.0)
     n = nx + ni + no
     A = sp.csr_matrix((vals, (rows, cols)), shape=(row, n))
     E = sp.csr_matrix((evals, (erows, ecols)), shape=(erow, n))
     price = np.array([sim.sell_price[m] + sim.shortfall_penalty[m] for m in o_mat])
+    if whole:
+        # an order filled in full earns its price, gets back its fine per unit and avoids its order fine
+        price = price * qty + np.array([sim.order_fine[m] for m in o_mat])
     c = np.concatenate([_energy_cost(sim, T), _storage_cost(sim, period_len), -price])
-    bounds = [(0, None)] * (nx + ni) + [(0, o.quantity) for o in orders]
-    res = linprog(c, A_ub=A, b_ub=rhs, A_eq=E, b_eq=erhs, bounds=bounds, method="highs")
-    assert res.status == 0, res.message
-    return -res.fun - _all_penalties(env) - sc.rent_per_second * sc.horizon
+    if not whole:
+        bounds = [(0, None)] * (nx + ni) + [(0, o.quantity) for o in orders]
+        res = linprog(c, A_ub=A, b_ub=rhs, A_eq=E, b_eq=erhs, bounds=bounds, method="highs")
+        assert res.status == 0, res.message
+        return -res.fun - _all_penalties(env) - sc.rent_per_second * sc.horizon
+    ub = np.concatenate([np.full(nx + ni, np.inf), np.ones(no)])
+    integrality = np.concatenate([np.zeros(nx + ni), np.ones(no)])
+    cons = [LinearConstraint(A, -np.inf, rhs), LinearConstraint(E, erhs, erhs)]
+    res = milp(c, constraints=cons, bounds=Bounds(0, ub), integrality=integrality,
+               options={"time_limit": 60, "mip_rel_gap": 1e-4})
+    assert res.x is not None, res.message
+    # If the solver stops early, its own bound is the safe number: never below the best possible
+    best = -res.mip_dual_bound if np.isfinite(getattr(res, "mip_dual_bound", np.nan)) else -res.fun
+    fines = sum(sim.order_fine[m] for m in o_mat)
+    return best - _all_penalties(env) - fines - sc.rent_per_second * sc.horizon
 
 
 def _energy_cost(sim, T: int) -> np.ndarray:
@@ -216,10 +210,22 @@ def oracle(env: FactoryEnv, time_limit=60):
     return value, plan, res
 
 
-def play_plan(env: FactoryEnv, seed, plan) -> Recorder:
-    """Play the oracle's minute-by-minute plan in the real simulator (the env carries out each plan as usual)"""
+def chosen_orders(env: FactoryEnv, res) -> np.ndarray | None:
+    """From the oracle's solver result for the episode just reset in env: True for each order it fills in full.
+    None when the scenario allows partial delivery (then there is no yes/no choice per order)."""
+    if env.sim.scenario.partial_delivery or res.x is None:
+        return None
+    return res.x[-len(env.sim.state.orders):] > 0.5
+
+
+def play_plan(env: FactoryEnv, seed, plan, keep_orders: np.ndarray | None = None) -> Recorder:
+    """Play the oracle's minute-by-minute plan in the real simulator (the env carries out each plan as usual).
+    With keep_orders, the orders marked False are declined at the start, so their stock stays for the others."""
     with Recorder(env.sim) as rec:
         env.reset(seed=seed)
+        if keep_orders is not None:
+            for i in np.flatnonzero(~keep_orders):
+                env.sim.decline(int(i))
         keep = KeepPolicy(env.action_space)
         t, done = 0, False
         while not done:
@@ -236,11 +242,38 @@ def play_plan(env: FactoryEnv, seed, plan) -> Recorder:
     return rec
 
 
+def time_split(rec: Recorder) -> dict[str, float]:
+    """Where the machine time of an episode went, as shares of all machine time:
+    shipped: work in units that shipped; unsold: work in finished products still in stock at the end;
+    parts: other work (parts left over or still being made); switching: changeovers;
+    waiting: stopped or short of inputs."""
+    sc = rec.scenario
+    run = rec.running_matrix()
+    total = run.size
+    busy = int((run != STOP).sum())
+    switches = 0
+    for m, col in zip(sc.machines, run.T):
+        seq = col[col != STOP]
+        if m.initial_recipe:
+            seq = np.concatenate([[sc.recipe_index[m.initial_recipe]], seq])
+        switches += int((seq[1:] != seq[:-1]).sum())
+    switching = min(switches * sc.changeover_time, total - busy)
+    load = unit_load(sc)
+    d = rec.deliveries_frame()
+    shipped = sum(row.shipped * sum(load[row.product].values()) for row in d.itertuples())
+    left = rec.stock[-1] if rec.stock else np.zeros(len(sc.materials))
+    unsold = sum(max(0.0, left[sc.material_index[p]] - sc.materials[sc.material_index[p]].initial_stock)
+                 * sum(load[p].values()) for p in sc.products)
+    return {"shipped": shipped / total, "unsold": unsold / total, "parts": (busy - shipped - unsold) / total,
+            "switching": switching / total, "waiting": (total - busy - switching) / total}
+
+
 def _summary(rec: Recorder) -> dict:
-    """The episode summary plus units shipped per product"""
+    """The episode summary plus units shipped per product and where the machine time went"""
     d = rec.deliveries_frame()
     by_product = d.groupby("product")["shipped"].sum().to_dict() if not d.empty else {}
-    return {**rec.summary(), "by_product": {p: float(by_product.get(p, 0.0)) for p in rec.scenario.products}}
+    return {**rec.summary(), "by_product": {p: float(by_product.get(p, 0.0)) for p in rec.scenario.products},
+            "time": time_split(rec)}
 
 
 def _check_seed(job) -> dict:
@@ -266,7 +299,8 @@ def _check_seed(job) -> dict:
 
         for path in models:
             model = MaskablePPO.load(path, device="cpu")
-            out[path] = _summary(model_episodes(env, model, [seed], "fixed")[0])
+            menv = FactoryEnv(scenario, horizon=horizon, ticks_per_action=P, **model_env_options(path))
+            out[path] = _summary(model_episodes(menv, model, [seed], "fixed")[0])
     return out
 
 
@@ -321,4 +355,13 @@ def run_check(scenario: str | Path, models: Sequence[str] = (), seeds: Sequence[
         summary["oracle planned"] = planned
         print(f"  {'oracle, as planned':50s}{planned:10,.0f}{planned / b if b > 0 else float('nan'):10.0%}")
     print(f"  {'upper bound':50s}{b:10,.0f}")
+
+    # Where the machine time went: only work in shipped units earns money
+    parts = ["shipped", "unsold", "parts", "switching", "waiting"]
+    print(f"\nShare of all machine time{'':25s}" + "".join(f"{p:>11s}" for p in parts))
+    for key in rows:
+        split = {p: float(np.mean([r[key]["time"][p] for r in res])) for p in parts}
+        summary[key]["time"] = split
+        label = key if len(key) <= 50 else "..." + key[-47:]
+        print(f"  {label:48s}" + "".join(f"{split[p]:11.0%}" for p in parts))
     return summary

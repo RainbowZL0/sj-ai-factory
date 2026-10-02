@@ -364,3 +364,52 @@ def test_without_partial_delivery_a_short_order_ships_nothing():
     assert d.shipped == 0 and d.revenue == 0
     assert d.penalty == 3 * 4  # every unit of the order is fined
     assert sim.state.stock[1] == 2  # the units stay in stock
+
+
+def test_a_declined_order_ships_nothing_and_leaves_its_stock():
+    small = {**TINY, "orders": {"fixed": [{"product": "B", "quantity": 2, "due_time": 5}]}}
+    for declined, shipped, left in [(False, 2, 0), (True, 0, 2)]:
+        sim = FactorySim(scenario_from_dict(small))
+        sim.reset(seed=0)
+        if declined:
+            sim.decline(0)
+        reports = [sim.step() for _ in range(5)]
+        d = reports[-1].deliveries[0]
+        assert d.shipped == shipped and d.penalty == (2 - shipped) * 4
+        assert sim.state.stock[1] == left
+
+
+def test_whole_order_bound_is_between_keep_and_the_part_order_bound():
+    from sjfactory.check import bound
+    from sjfactory.evaluate import run_episode
+
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-busy.yaml", ticks_per_action=60)
+    env.reset(seed=2000)
+    whole, part = bound(env), bound(env, whole_orders=False)
+    keep = run_episode(env, KeepPolicy(env.action_space), seed=2000).summary()["profit"]
+    assert keep < whole <= part + 1e-6
+
+
+def test_order_slack_leaves_out_orders_that_do_not_fit():
+    env = FactoryEnv(ticks_per_action=60, order_slack=True)
+    assert env.observation_space.shape[0] == FactoryEnv(ticks_per_action=60).observation_space.shape[0] + 20
+    env.reset(seed=0)
+    s = env.sim.state
+    s.stock[:] = 0
+    s.stock[env.sim.scenario.material_index["IronOre"]] = s.stock[env.sim.scenario.material_index["CopperOre"]] = 1e5
+    Order = type(s.orders[0])
+    # 10 s of every kind's time per unit (30 s on each of 3 machines): 20 units take 200 s
+    orders = [Order("Motor", 20, 250), Order("Frame", 20, 300), Order("Motor", 5, 600)]
+    slack = env.order_slack_seconds(orders)
+    # the Frames don't fit, so the last order only waits for the 20 + 5 Motors: 600 - 250 s
+    assert slack.tolist() == [50, -100, 350]
+
+
+def test_machine_time_split_adds_up():
+    from sjfactory.check import time_split
+    from sjfactory.evaluate import run_episode
+
+    env = FactoryEnv(horizon=1800, ticks_per_action=60)
+    split = time_split(run_episode(env, KeepPolicy(env.action_space), seed=2000))
+    assert sum(split.values()) == pytest.approx(1.0)
+    assert all(v >= 0 for v in split.values()) and split["shipped"] > 0

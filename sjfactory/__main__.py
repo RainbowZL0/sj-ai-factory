@@ -17,7 +17,9 @@ from pathlib import Path
 
 from sjfactory import web
 from sjfactory.env import FactoryEnv
-from sjfactory.evaluate import BASELINES, MODEL_MODES, baseline_policy, cash_curve, evaluate, model_episodes, run_episode
+from sjfactory.evaluate import (
+    BASELINES, MODEL_MODES, baseline_policy, cash_curve, evaluate, model_env_options, model_episodes, run_episode,
+)
 from sjfactory.recorder import Recorder
 from sjfactory.spec import DEFAULT_SCENARIO, PROJECT_ROOT
 
@@ -56,7 +58,8 @@ def finish(rec: Recorder, out: Path, policy: str, args) -> Path:
 
 def make_env(args) -> FactoryEnv:
     return FactoryEnv(
-        args.scenario, horizon=args.horizon, ticks_per_action=args.ticks, move_cost=getattr(args, "move_cost", 0.0)
+        args.scenario, horizon=args.horizon, ticks_per_action=args.ticks, move_cost=getattr(args, "move_cost", 0.0),
+        order_slack=getattr(args, "order_slack", False),
     )
 
 
@@ -105,6 +108,7 @@ def cmd_train(args):
         gamma=args.gamma,
         keep_bias=args.keep_bias,
         move_cost=args.move_cost,
+        order_slack=args.order_slack,
         test_seeds=seeds,
     )
 
@@ -176,6 +180,7 @@ def cmd_eval(args):
     from sb3_contrib import MaskablePPO
 
     model = MaskablePPO.load(args.model)
+    args.order_slack = model_env_options(args.model).get("order_slack", False)
     env = make_env(args)
     out = new_run_dir("eval")
     web.write_config(out, **base_config(args, "eval", env), model=str(args.model), mode=args.mode)
@@ -229,6 +234,10 @@ def main():
         help="taken off the reward for each machine moved in the plan; profit is not affected",
     )
     t.add_argument("--keep-bias", type=float, default=0.0, help="how strongly a fresh model prefers the starting plan (0: no preference)")
+    t.add_argument(
+        "--order-slack", action="store_true",
+        help="also show the model, per order, the time to spare once it and the earlier orders that fit are made",
+    )
     t.add_argument("--tests", type=int, default=3, help="test episodes (seeds) per check")
     t.add_argument("--test-seed", type=int, default=1000, help="first test seed; tests use fixed orders")
     t.add_argument("--test-every", type=int, default=0, help="steps between checks (default: 20 checks per run)")

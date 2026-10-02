@@ -6,6 +6,7 @@ reinforcement learning) is decided outside and passed in through step(changes).
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -138,6 +139,12 @@ class FactorySim:
             orders.append(Order(product=product, quantity=quantity, due_time=due, known_time=known))
         return orders
 
+    def decline(self, position: int):
+        """Give up the order at this position in state.orders: when due it ships nothing and is fined as a short
+        order, and the stock stays for other orders. Without this, every due order takes stock if it can."""
+        o = self.state.orders[position]
+        self.state.orders[position] = dataclasses.replace(o, declined=True)
+
     @property
     def idle(self) -> np.ndarray:
         """[machine] True if the machine is neither running a batch nor in a changeover, so it may switch recipe"""
@@ -197,7 +204,7 @@ class FactorySim:
             o = s.orders.pop(0)
             i = sc.material_index[o.product]
             shipped = min(o.quantity, s.stock[i])
-            if not sc.partial_delivery and shipped < o.quantity:
+            if (not sc.partial_delivery and shipped < o.quantity) or o.declined:
                 shipped = 0  # all or nothing: a short order ships nothing and is fined in full
             s.stock[i] -= shipped
             deliveries.append(

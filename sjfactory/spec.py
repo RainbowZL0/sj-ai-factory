@@ -5,6 +5,7 @@ A scenario never changes after loading. Everything that changes over time lives 
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -49,6 +50,7 @@ class Order:
     quantity: float
     due_time: int  # absolute time in seconds; ships whatever stock exists at that moment
     known_time: int = 0  # when the order becomes known; before that the model can't see it
+    declined: bool = False  # given up on purpose: ships nothing when due (fined as usual), so its stock stays
 
 
 @dataclass(frozen=True)
@@ -201,6 +203,34 @@ class Scenario:
                 lo, hi = ro.notice_range
                 if not 0 <= lo <= hi or lo >= self.horizon:
                     raise ValueError("random order notice range must satisfy 0 <= low <= high, low < horizon")
+
+
+def unit_load(sc: Scenario, materials: Sequence[str] | None = None) -> dict[str, dict[str, float]]:
+    """{product: {machine kind: machine seconds per unit}}, following the first runnable recipe that makes each
+    material back to materials no runnable recipe makes (those count as raw). Pass materials for other ones."""
+    maker = {}
+    for i, r in enumerate(sc.recipes):
+        if sc.can_ever_run(i):
+            for name in r.outputs:
+                maker.setdefault(name, r)
+    load = {}
+    for product in sc.products if materials is None else materials:
+        seconds: dict[str, float] = {}
+
+        def add(name: str, qty: float, depth=0):
+            r = maker.get(name)
+            if r is None:
+                return
+            if depth > len(sc.recipes):
+                raise ValueError(f"recipes for {name} go round in a circle")
+            batches = qty / r.outputs[name]
+            seconds[r.category] = seconds.get(r.category, 0.0) + batches * r.cycle_time
+            for inp, q in r.inputs.items():
+                add(inp, batches * q, depth + 1)
+
+        add(product, 1.0)
+        load[product] = seconds
+    return load
 
 
 def load_scenario(path: str | Path = DEFAULT_SCENARIO) -> Scenario:

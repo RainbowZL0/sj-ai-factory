@@ -8,7 +8,7 @@
 2. **Start batches.** Every idle machine that has a recipe starts if the stock covers the inputs. Inputs are taken now. Machines are served in list order, or with `input_priority: downstream` the machines whose recipe is furthest from the raw materials first (`Scenario.recipe_depth`), then in list order.
 3. **Use power.** Running machines use `power_kw × 1 s` of energy.
 4. **Advance one second.** Changeovers count down. Batches that reach zero put their outputs into stock.
-5. **Settle due orders.** Orders whose due time has arrived ship whatever stock exists. Missing units cost `shortfall_penalty` each, plus `order_fine` once per order not filled in full. With `partial_delivery: false` an order ships only if the full quantity is in stock; otherwise nothing ships, nothing is paid, every unit of the order is fined, and the stock stays for later orders.
+5. **Settle due orders.** Orders whose due time has arrived ship whatever stock exists. Missing units cost `shortfall_penalty` each, plus `order_fine` once per order not filled in full. With `partial_delivery: false` an order ships only if the full quantity is in stock; otherwise nothing ships, nothing is paid, every unit of the order is fined, and the stock stays for later orders. An order given up on purpose (`FactorySim.decline`) is settled the same way even if the stock would cover it; nothing declines orders unless a caller asks.
 6. **Settle cash.** Cash changes by revenue − penalty − energy − storage − rent.
 
 All machines share one warehouse, so the scenario needs no links between machines. The real connections are the material flow chart (`material_flow.png`), drawn from the recipes.
@@ -49,7 +49,8 @@ Variants used only by experiments 11 and 13 (storage costs, a single tight kind,
 `uv run python -m sjfactory --scenario <file> check [models ...]` prints, in under a minute:
 - the machine seconds each product needs from each kind, and the most of each product per episode;
 - the orders, and the share of each kind's time they need;
-- the profit of keep, any models given, the look-ahead planner (`lookahead.py`: tries each move in a copy of the simulator, 30 minutes ahead, so it sees batches and input order; slower and weaker than a trained model), the oracle and the upper bound (see [experiment 9](../experiments/09-bottleneck-analysis.md)), on seeds 2000 to 2009, each as a share of the upper bound. The bound and the oracle count energy and storage costs; storage is charged on the stock at the end of each period, so with storage costs the bound is close but not strict.
+- the profit of keep, any models given, the look-ahead planner (`lookahead.py`: tries each move in a copy of the simulator, 30 minutes ahead, so it sees batches and input order; slower and weaker than a trained model), the oracle and the upper bound (see [experiment 9](../experiments/09-bottleneck-analysis.md)), on seeds 2000 to 2009, each as a share of the upper bound. When the scenario ships whole orders only, the bound treats each order as a yes/no choice (experiment 15: on the lab scenarios this changes it by 0.2% at most). The bound and the oracle count energy and storage costs; storage is charged on the stock at the end of each period, so with storage costs the bound is close but not strict.
+- where each policy's machine time went: work in units that shipped, in finished products left unsold at the end, in other parts, changeovers, and waiting. Only the first earns money, so this shows where a policy loses against the oracle.
 
 Use it to see whether a change to the factory changes anything before spending a training run on it.
 

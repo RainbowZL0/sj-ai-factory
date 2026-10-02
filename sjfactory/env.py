@@ -25,7 +25,7 @@ import numpy as np
 from gymnasium import spaces
 
 from sjfactory.sim import STOP, FactorySim
-from sjfactory.spec import DEFAULT_SCENARIO, Scenario, load_scenario
+from sjfactory.spec import DEFAULT_SCENARIO, Scenario, load_scenario, unit_load
 
 NO_CHANGE = 0  # a kind's choice that keeps its plan as it is
 
@@ -63,6 +63,7 @@ class FactoryEnv(gym.Env):
         visible_orders: int = 20,
         reward_scale: float = 0.01,
         move_cost: float = 0.0,
+        order_slack: bool = False,
     ):
         """
         :param horizon: overrides the scenario's seconds per episode
@@ -70,6 +71,9 @@ class FactoryEnv(gym.Env):
         :param visible_orders: how many of the earliest-due known orders go into the observation
         :param move_cost: taken off the reward (in cash units) for every machine moved in the plan, to discourage
             needless changeovers. Only the reward pays it; cash and profit don't change.
+        :param order_slack: also show, for each visible order, the time to spare once it and the earlier orders
+            that still fit are made (see order_slack()). Changes the observation, so models trained with and
+            without it can't be swapped.
         """
         if not isinstance(scenario, Scenario):
             scenario = load_scenario(scenario)
@@ -81,6 +85,7 @@ class FactoryEnv(gym.Env):
         self.visible_orders = visible_orders
         self.reward_scale = reward_scale
         self.move_cost = move_cost
+        self.order_slack = order_slack
 
         sc = scenario
         kinds, start = [], 0
@@ -102,6 +107,11 @@ class FactoryEnv(gym.Env):
         self.stock_unit = np.where(unit > 0, unit, biggest_order)
 
         self._product_index = {p: i for i, p in enumerate(sc.products)}
+        # [product, kind]: seconds of the whole kind's time one unit needs (machine seconds / machines of that kind)
+        load = unit_load(sc)
+        cats = list(dict.fromkeys(m.category for m in sc.machines))
+        n_cat = [sum(m.category == c for m in sc.machines) for c in cats]
+        self._unit_seconds = np.array([[load[p].get(c, 0.0) / n for c, n in zip(cats, n_cat)] for p in sc.products])
         n_rcp = len(sc.recipes)
         obs_dim = (
             1  # time progress
@@ -109,7 +119,7 @@ class FactoryEnv(gym.Env):
             + 2 * len(self.slot_recipe)  # per slot: machines on that recipe now, and planned
             + self.sim.n_machines * (n_rcp + 4)  # recipe (including stop), batch left, changeover left, waiting for inputs
             + len(sc.products)  # units still ordered per product, over all known orders
-            + visible_orders * (len(sc.products) + 2)  # product, quantity, time until due
+            + visible_orders * (len(sc.products) + 2 + order_slack)  # product, quantity, time until due, [slack]
         )
         # Every value is already squashed close to 0; even _squash(1e40) is only about 9
         self.observation_space = spaces.Box(-10, 10, (obs_dim,), np.float32)
@@ -207,11 +217,14 @@ class FactoryEnv(gym.Env):
         demand = np.zeros(len(sc.products))
         for o in known:
             demand[self._product_index[o.product]] += o.quantity
-        orders = np.zeros((self.visible_orders, len(sc.products) + 2))
+        n_p = len(sc.products)
+        orders = np.zeros((self.visible_orders, n_p + 2 + self.order_slack))
         for row, o in zip(orders, known[: self.visible_orders]):
             row[self._product_index[o.product]] = 1
-            row[-2] = _squash(o.quantity)
-            row[-1] = (o.due_time - s.clock) / sc.horizon
+            row[n_p] = _squash(o.quantity)
+            row[n_p + 1] = (o.due_time - s.clock) / sc.horizon
+        if self.order_slack:
+            orders[: len(known), -1] = self.order_slack_seconds(known[: self.visible_orders]) / sc.horizon
 
         return np.concatenate(
             [
@@ -225,6 +238,24 @@ class FactoryEnv(gym.Env):
                 orders.ravel(),
             ]
         ).clip(-10, 10).astype(np.float32)
+
+    def order_slack_seconds(self, orders) -> np.ndarray:
+        """For orders sorted by due time: seconds to spare at each order's due time if the factory makes that order
+        and the earlier ones that fit, from the finished products in stock, at full speed on every machine kind.
+        Negative means the order doesn't fit; it is then left out for the orders after it, as the factory will
+        miss it anyway. A rough guide (it ignores parts in stock, waiting and changeovers), not a plan."""
+        s, sc = self.sim.state, self.sim.scenario
+        stock = np.array([s.stock[sc.material_index[p]] for p in sc.products])
+        taken = np.zeros(len(sc.products))  # units of the orders that fit so far
+        slack = np.zeros(len(orders))
+        for i, o in enumerate(orders):
+            p = self._product_index[o.product]
+            taken[p] += o.quantity
+            busy = (np.maximum(taken - stock, 0) @ self._unit_seconds).max(initial=0.0)
+            slack[i] = o.due_time - s.clock - busy
+            if slack[i] < 0:
+                taken[p] -= o.quantity
+        return slack
 
     def _info(self) -> dict:
         return {"clock": self.sim.state.clock, "cash": self.sim.state.cash}

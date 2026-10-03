@@ -1,4 +1,4 @@
-<h1 align="center">sj-rl-factory-schedule</h1>
+<h1 align="center">rl-factory-schedule</h1>
 
 <p align="center">
   A factory simulator where a reinforcement learning model decides which machine makes what.<br>

@@ -4,7 +4,7 @@
 
 For each machine kind (category), how many machines should run each of its recipes. An episode starts with the plan the machines start in, so a model that never changes it plays exactly like the keep rule.
 
-Recipes that can never run, because an input can never be obtained (`Scenario.obtainable`: starting stock plus anything made from it), are left out. In `default.yaml` there is no ore, so the casters are left out and never run; in `casters.yaml` they are planned like any other kind.
+Recipes that can never run, because an input can never be obtained (`Scenario.obtainable`: starting stock plus anything made from it), are left out. In `large/default.yaml` there is no ore, so the casters are left out and never run; in `large/casters.yaml` they are planned like any other kind.
 
 ## Action: one move per kind
 
@@ -34,7 +34,10 @@ One flat vector, all squeezed to small values:
 - per kind and recipe: machines on it now, and machines planned
 - per machine: its recipe (one‑hot, meaning a row of zeros with a single 1), the fraction of its batch left, the fraction of its changeover left, and whether it is waiting for inputs
 - units still ordered per product, over all known orders
+- optional (`train --demand-outlook`, saved in the run's `config.json`): how many units a usual day still has to announce at this second, on average over days. It comes only from the scenario's order settings (number and size of orders, notice, when they fall due), which a factory would know from experience, never from the orders of the day being played (roadmap milestone 6).
 - the 20 known orders due soonest: product, quantity and time until due. Orders not yet known (see `notice` in [simulation.md](simulation.md)) are hidden.
+- only in scenarios with breakdowns, or with `show_breakdowns` (set by `train --mix` when any scenario in the mix has breakdowns, and saved in the run's `config.json`): per machine, the repair time left (divided by the longest possible; always 0 on days without breakdowns). So one model can play days with and without breakdowns.
+- optional (`train --order-slack`, saved in the run's `config.json`, so `check` and `eval` set it up again for that model): for each of those orders, the time to spare at its due time if the factory makes it and the earlier orders that fit, from the finished products in stock, with every machine kind at full speed. Negative means the order doesn't fit; it is then left out for the later orders, since the factory will miss it anyway. It is a rough guide (it ignores parts in stock, waiting and changeovers) that saves the model from adding up orders itself (roadmap milestone 3).
 
 Prices and other constants are left out because they never change within a scenario; cash is left out because it does not change what the best decision is.
 

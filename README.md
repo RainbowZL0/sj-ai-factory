@@ -1,8 +1,8 @@
-<h1 align="center">sj-rl-factory-schedule</h1>
+<h1 align="center">rl-factory-schedule</h1>
 
 <p align="center">
   A factory simulator where a reinforcement learning model decides which machine makes what.<br>
-  Work in progress: it already earns more than the "change nothing" rule.
+  Work in progress: it already beats planners that know only the orders announced so far.
 </p>
 
 <p align="center">
@@ -13,20 +13,22 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/profit.png" alt="Cash over time: trained model 118k, keep 56k, random plans -68k" width="860">
+  <img src="docs/images/profit.png" alt="Cash over one hour on the lab factory: trained model 111k, keep 38k, random plans -93k" width="860">
 </p>
 
-Reinforcement learning (RL) means a program learns by trial and error, guided by a reward score. Here the reward is money earned. Every minute the model may move one machine of each kind to another recipe, and the simulator plays out the next minute.
+Reinforcement learning (RL) means a program learns by trial and error, guided by a reward score. Here the reward is money earned. Every minute the model may move one machine of each kind to another recipe, and the simulator plays out the next minute. Customers order products with a due time, and an order is paid only if it ships in full; a short order is fined.
 
-This project is still in development. These are the results so far, and they will change.
+This project is still in development. Results so far, on the small lab factory (`scenarios/lab.yaml` and its variants):
 
-| Policy | Test profit | Ordered units shipped |
-|---|---|---|
-| **Trained model** (1M decisions, about 13 minutes) | **about 120k** | **about 88%** |
-| Keep (every machine stays on its starting recipe) | 58.9k | 39% |
-| Random plans (before the move action) | -68.3k | about 2% |
+| Policy | Light to busy days | Busy days | Short notice | Breakdowns |
+|---|---|---|---|---|
+| **Trained model** (2M decisions, about 15 minutes, trained on that kind of day or on busy days) | **88%** | **87%** | **83%** | **74%** |
+| Planner that re-plans every 5 minutes from the orders announced so far | 86% | 82% | 61% | 71% |
+| Oracle: plans once, knowing every order in advance | 87% | 85% | 85% | 70% |
+| Planner that re-plans every 5 minutes, knowing every order in advance | 91% | 90% | 87% | 70% |
+| Keep: every machine stays on its starting recipe | -22% | -31% | -26% | -43% |
 
-Profit is the mean over three test episodes with fixed orders, on the larger factory of experiments 1 to 9 (`scenarios/casters.yaml`). The default is now the small lab factory (`scenarios/lab.yaml`).
+Numbers are shares of the upper bound, a profit no schedule can beat, over 30 days each (`uv run python -m sjfactory bench`). The model beats every planner that knows only what it knows; only a planner that sees the future does better, and not when machines break down. The [roadmap](docs/roadmap.md) says what we aim for and what comes next.
 
 ## How it works
 
@@ -40,33 +42,34 @@ flowchart LR
     B --> E["HTML pages and charts"]
 ```
 
-The model starts out knowing nothing. After about 120k decisions it beats keep, and it levels off near 120k profit:
+The model starts out knowing nothing. After about 25k decisions it is far ahead of keep, and it levels off within about 300k:
 
 <p align="center">
-  <img src="docs/images/learning.png" alt="Test profit while training: the model passes keep after about 120k decisions and settles near 120k profit" width="860">
+  <img src="docs/images/learning.png" alt="Test profit while training: the model passes keep almost at once and settles near 140k on the test days" width="860">
 </p>
 
 The solid line is the model taking its most likely choices. The dashed line is it drawing choices at random, as it does in training. Both end in the same place, so the model really has a plan and is not relying on luck.
 
-This is what the plan looks like on the factory floor: 14 constructors on top, 5 assemblers at the bottom, one colour per recipe.
+This is what the plan looks like on the factory floor: 3 smelters, 3 constructors and 3 assemblers, one colour per recipe.
 
 <p align="center">
-  <img src="docs/images/schedule.png" alt="Machine schedule of the trained model" width="860">
+  <img src="docs/images/schedule.png" alt="Machine schedule of the trained model on the lab factory" width="860">
 </p>
 
-The pictures come from one training run; `uv run python scripts/readme_images.py runs/<folder>` redraws them.
+The pictures come from one training run on `lab.yaml`; `uv run python scripts/readme_images.py runs/<folder>` redraws them.
 
-All docs start at [docs/README.md](docs/README.md): [design](docs/design/README.md) (simulation rules, what the model decides and sees, training) and [experiments](docs/experiments/README.md) (results so far, lessons, next steps).
-
+All docs start at [docs/README.md](docs/README.md): the [roadmap](docs/roadmap.md), [design](docs/design/README.md) (simulation rules, what the model decides and sees, training) and [experiments](docs/experiments/README.md) (results so far, lessons).
 ## Run
 
 ```bash
 uv run python -m sjfactory run --policy keep         # every machine keeps its starting recipe
 uv run python -m sjfactory run --policy random
 uv run python -m sjfactory --note "what I changed" train --steps 1000000   # MaskablePPO; steps = decisions, one per 60 s
+uv run python -m sjfactory --scenario scenarios/lab-busy.yaml train --mix scenarios/lab-short.yaml   # train on several kinds of day at once
 uv run python -m sjfactory eval runs/<folder>/best_model.zip --mode sampled   # or --mode fixed
 uv run python -m sjfactory view                      # list of all runs in the browser
 uv run python -m sjfactory check                     # machine load, keep, oracle and upper bound in under a minute, no training
+uv run python -m sjfactory bench runs/<folder>/best_model.zip   # share of the upper bound on each kind of test day
 uv run pytest
 ```
 
@@ -86,9 +89,10 @@ Each run folder also holds `summary.json`, `history.xlsx`, `dashboard.png`, `gan
 
 ## Layout
 
-- `scenarios/lab.yaml`: the default factory, small and balanced for quick experiments. A variant file names it as `base:` and lists only what changes (see `lab-busy.yaml`)
-- `scenarios/default.yaml`, `casters.yaml`, `varied.yaml`: the larger factory used in experiments 1 to 9
-- `sjfactory/`: the code (`spec` → `sim` → `env` → `policies`, plus `evaluate`, `training`, `recorder`, `plots` and `web` for running and watching)
+- `scenarios/lab.yaml`: the default factory, small and balanced for quick experiments. A variant file names it as `base:` and lists only what changes: `lab-busy.yaml` (more orders than capacity), `lab-mixed.yaml` (light to busy days), `lab-three.yaml` and `lab-three-downstream.yaml` (a third product that shares parts)
+- `scenarios/large/`: the larger factory of experiments 1 to 9, now parked; the tests still use it
+- `sjfactory/`: the code (`spec` → `sim` → `env` → `policies`, plus `check`, `lookahead`, `evaluate`, `training`, `recorder`, `plots` and `web` for checking, running and watching)
+- `scripts/readme_images.py`: redraws the pictures on this page
 - `tests/`: tests
 
 Generated files (`runs/`, `*.png`, `*.xlsx`, `*.zip`) are ignored by git. Don't commit them. The pictures in `docs/images/` are the one exception.

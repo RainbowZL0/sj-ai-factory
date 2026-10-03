@@ -2,24 +2,34 @@
 
 What was tried in training, what happened, and what it taught us. Run folders live in `runs/` on the machine that made them (not in git); `runs/index.html` compares them.
 
-All profits are the mean over test seeds 1000, 1001 and 1002 (the same orders every time), per 5000 s episode.
+Profits in experiments 1 to 9 are the mean over test seeds 1000, 1001 and 1002 per 5000 s episode, on the large factory. From experiment 10 on, results come from `check` on the lab factory: the mean over new seeds 2000 to 2009 per one-hour episode, often as a share of the upper bound.
 
-## Where things stand (2026-10-02)
+The plan for what comes next is in the [roadmap](../roadmap.md).
 
-**New default: the small lab factory** ([experiment 10](10-lab-factory.md)). It has 9 machines, round numbers and a load that can be checked by hand. A training run reaches its plateau in about 2 minutes. `python -m sjfactory check` shows keep, the oracle and the upper bound in under a minute. On new seeds the model reaches 96% of the upper bound (oracle 97%, keep 32%). Test ideas for the factory here first, as variant files (`base: lab.yaml`).
+## Where things stand (2026-10-03)
 
-First ideas tried ([experiment 11](11-lab-variants.md)): serving machines further down the line first changes nothing; spare time before the bottleneck lifts the oracle to 100% of the bound; storage costs hurt keep but not a model. The model trained on more orders than capacity (`lab-busy.yaml`) is the best on every lab scenario.
+**The lab factory** (`scenarios/lab.yaml`, [experiment 10](10-lab-factory.md)) is where all work happens: 9 machines, round numbers, a training run levels off in a few minutes, and `check` compares keep, models, the look-ahead planner, the oracle and the upper bound in under a minute.
 
-With a third product whose gear maker shares plates with the assemblers ([experiment 12](12-mixed-demand-and-three-products.md)), machine order starves the line: keep ships nothing and the oracle's played plan reaches only 53% of the bound. The model works around it (93%); with downstream priority, 95%. Compare against the upper bound; the oracle is only a fair yardstick when flow within a minute is smooth.
+**Since experiment 14 the lab ships whole orders only**: a short order earns nothing and is fined its full quantity at the full price.
 
-Stricter penalties, per unit or per order, don't change which product gets the machines ([experiment 13](13-yardsticks-and-penalties.md)): all models ship the same mix. Product priority is a weak signal because each product displaces another on a busy machine, so the gain is only the difference in value. Order notice is generous (10 to 30 times the time to make a product). A look-ahead planner in the real simulator is now in `check`, but it is weaker than the models.
+**Since experiment 17** (`bench`, 30 days per kind of day, share of the upper bound): the best models get 88% on light-to-busy days, 87% on busy days and 86% on three-product days. That beats the oracle (87%, 85%, 69%) and a planner that re-plans every 5 minutes from the orders announced so far (86%, 82%, 59%). Only a planner that also knows the orders still to come does better on two products (91%, 90%). The busy-day gap of experiment 14 came mostly from testing on too few days and training too briefly ([16](16-busy-days-longer-training.md)). Judge models on 30 days or more, and look at the final model as well as the "best" one.
 
-**Since experiment 14 the lab ships whole orders only** (`partial_delivery: false`): a short order earns nothing and is fined its full quantity at the full price. Numbers from experiments 10 to 13 come from the old rules. Under the new rules the model reaches 89 to 91% of the upper bound on normal days, ahead of or level with the oracle, but only 79% on busy days, where the oracle gets 87%. Gamma 0.98 or 0.99 did worse than 0.97 in 500k steps.
+**Since experiment 18** `bench` also has short-notice and breakdown days, where reacting matters more than planning ahead ([18](18-short-notice-and-breakdowns.md)). With short notice the fair planner drops to 61% while the busy-day model keeps 82% (83% when trained on short notice). With breakdowns the model gets 74% and every planner 70-71%, even the one that knows every order. The upper bound now takes off the machine time lost to breakdowns.
 
-The rest of this section is about the larger factory of experiments 1 to 9 (`casters.yaml`, `varied.yaml`).
+**Since experiment 19** one model (`runs/1003_024435-train/best_model.zip`, `train --mix`) plays every two-product kind of day: 86% light to busy, 84% busy, 82% short notice, 76% breakdowns, 1 to 2 points behind the models trained on one kind of day and ahead of them on breakdowns ([19](19-one-model-for-all-days.md)). With the demand outlook ([20](20-demand-outlook.md)) the final one-model run, `runs/1003_043348-train/model.zip`, is level with them: 88/85/83/73%.
 
+What earlier lab experiments settled (numbers under the old rules, where part of an order was paid):
+- Serving machines further down the line first only matters when a material feeds recipes at different depths ([11](11-lab-variants.md), [12](12-mixed-demand-and-three-products.md)). There, machine order starves the line and the oracle fails (53%), while the model works around it (93%).
+- Spare time before the bottleneck lifts the oracle to 100% of the bound; storage costs hurt keep but not a model ([11](11-lab-variants.md)).
+- Training on busy days gives a model that is best on every lab scenario ([11](11-lab-variants.md), [12](12-mixed-demand-and-three-products.md)).
+- Stricter penalties don't change which product gets the machines, because on a busy machine the gain is only the difference in product value ([13](13-yardsticks-and-penalties.md)). Order notice is generous, 10 to 30 times the time to make a product.
+- Gamma stays at 0.97: 0.98 and 0.99 did worse in 500k steps ([14](14-whole-orders-and-gamma.md)).
 
-Two trained models, both with the move action and a move cost of 50, on the casters factory:
+The scenario files used only by experiments 11 and 13 (`lab-storage`, `lab-bottleneck`, `lab-three-strict`, `lab-three-orderfine`) were removed on 2026-10-03; get them back from git history if needed (`git log --all -- scenarios/lab-storage.yaml`).
+
+### The large factory (experiments 1 to 9, finished)
+
+The files are now in `scenarios/large/`. Two trained models, both with the move action and a move cost of 50, on the casters factory:
 
 | Orders (30 new seeds each) | Keep | Trained on the usual orders | Trained on varied orders |
 |---|---|---|---|
@@ -28,24 +38,13 @@ Two trained models, both with the move action and a move cost of 50, on the cast
 | Almost only Motor | 164,590 | 161,190 | 175,910 |
 | Tough: 100 large orders, known 900 to 2400 s ahead | -51,520 | -65,330 | -33,150 |
 
-- The action is one move per machine kind per minute ([experiment 7](07-move-action-and-casters.md)): the same level as the old plan action in less than half the steps. The casters are back and learned just as well.
-- A model trained on the usual orders plays one plan for that mix and loses to keep when the orders take another shape ([experiment 6](06-other-orders.md)). Trained on varied orders ([experiment 8](08-varied-orders.md)), it beats keep on every order shape tested, at a cost of about 10k on the usual shape.
-- Early orders used to be impossible (the first Frame takes about 550 s). Orders can now have a notice time, and nothing is due before it.
-- A move cost of 50 in the reward cut changeovers from 203 to 46 per episode on varied orders, without losing profit.
-
-The model is no longer the main limit: on every order type it matches or beats an oracle planner that knows all orders in advance ([experiment 9](09-bottleneck-analysis.md)). With the usual orders, demand is the limit; with heavy orders, the constructors' iron bar and screw time. Use `python -m sjfactory --scenario <file> check <model>` to see how close a model gets to the upper bound.
+- The action is one move per machine kind per minute ([experiment 7](07-move-action-and-casters.md)).
+- A model trained on one order shape plays one plan; trained on varied orders it beats keep on every shape tested ([6](06-other-orders.md), [8](08-varied-orders.md)).
+- On every order type the models match or beat the oracle ([9](09-bottleneck-analysis.md)). The open questions there are parked in the roadmap.
 
 ## Next steps
 
-1. Busy days under whole orders: the model is 8 points behind the oracle at choosing which orders to drop. Try longer training on `lab-busy.yaml` (gamma stays 0.97), or show the model how much work the known orders need compared with the machine time left.
-2. Shorter notice (for example 120 to 600 s) to test reacting, not just dividing machine time; show 30 orders instead of 20.
-3. Break ties in input priority: machines that make a product first, then those that make parts (under keep, `lab-three-downstream.yaml` ships no Frames).
-4. Find where batch flow loses 10 to 15% in the larger factory: input priority is not it (experiment 11). Next suspect: machines waiting for a full batch of inputs (Rotor needs 25 screws).
-5. Harder lab variants that need planning: machine breakdowns, or a machine kind that can only run some recipes.
-6. Larger factory: train the varied model longer (for example 3M steps; it was still improving at 1M). It is 10k behind the usual model on the usual orders.
-7. Keep the move cost at 50 or lower: useful plans switch 60 to 110 times per episode.
-8. Scenario ideas from [Not modelled yet](../design/simulation.md#not-modelled-yet).
-
+See the [roadmap](../roadmap.md). Milestone 5 is done and one model now covers every two-product kind of day (milestone 6, step 1). Training the mix twice as long didn't help; showing how much demand usually still comes gave a small gain, maybe noise ([20](20-demand-outlook.md)). Next: see the roadmap.
 ## Experiments
 
 | # | Page | Change | Result |
@@ -64,6 +63,12 @@ The model is no longer the main limit: on every order type it matches or beats a
 | 12 | [12-mixed-demand-and-three-products.md](12-mixed-demand-and-three-products.md) | Mixed demand; third product sharing plates across depths | Busy-day training is enough; machine order starves the line, the model works around it (93%), the oracle can't (53%) |
 | 13 | [13-yardsticks-and-penalties.md](13-yardsticks-and-penalties.md) | Look-ahead planner; strict penalties and order fines; order notice | Stricter penalties don't change priorities; the missed Motors cost only 1 to 2.5%; notice is generous |
 | 14 | [14-whole-orders-and-gamma.md](14-whole-orders-and-gamma.md) | Whole orders only, fine = full price; gamma 0.98 and 0.99 | Same behaviour; busy days are the weak spot (79% against the oracle's 87%); higher gamma worse at 500k |
+| 15 | [15-whole-order-bound-and-machine-time.md](15-whole-order-bound-and-machine-time.md) | Whole-order bound; where machine time goes; declining orders | Bound moves 0.2% at most, so the gap is real; the model loses by making products that never ship (10% of machine time, oracle 6%) |
+| 16 | [16-busy-days-longer-training.md](16-busy-days-longer-training.md) | 2M steps on busy days; order slack; 30 test days | Longer training closes the gap (87% against the oracle's 85% on 30 days); 10 days are too few; order slack adds nothing |
+| 17 | [17-replanning-yardsticks.md](17-replanning-yardsticks.md) | Oracle re-planned every 5 minutes, with all orders or only announced ones | Model beats the fair planner by 2-5 points and is 3 below the one that sees the future; knowing orders ahead is worth 5-8 points |
+| 18 | [18-short-notice-and-breakdowns.md](18-short-notice-and-breakdowns.md) | Short notice (`lab-short`); machine breakdowns as a setting (`lab-breakdowns`); bound counts breakdowns | Short notice: model 83%, fair planner 61%. Breakdowns: model 74%, every planner 70-71% |
+| 19 | [19-one-model-for-all-days.md](19-one-model-for-all-days.md) | One model trained on a mix of light-to-busy, busy, short-notice and breakdown days (`train --mix`) | Within 1-2 points of the specialists, 2 ahead on breakdowns (76%); matches or beats the fair planner everywhere; 8M steps no better |
+| 20 | [20-demand-outlook.md](20-demand-outlook.md) | Show how many units a usual day still has to announce (`--demand-outlook`) | Final model +1 to 4 points (88/85/83/73%), level with the specialists; the "best" versions barely move, so maybe noise |
 
 A new experiment page says: what changed and why, the run folder, the settings, a results table, and what it taught.
 

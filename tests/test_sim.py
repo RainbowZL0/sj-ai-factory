@@ -10,7 +10,7 @@ from sjfactory.policies import KeepPolicy, RandomPolicy
 from sjfactory.recorder import Recorder
 from sjfactory.spec import PROJECT_ROOT, scenario_from_dict
 
-FACTORY = PROJECT_ROOT / "scenarios" / "default.yaml"  # the large factory most tests were written for
+FACTORY = PROJECT_ROOT / "scenarios" / "large" / "default.yaml"  # the large factory most tests were written for
 
 # One machine that turns A into B; B can be sold
 TINY = {
@@ -102,7 +102,7 @@ def test_same_seed_same_orders():
 
 
 def test_varied_orders_follow_their_ranges():
-    sim = FactorySim(load_scenario(PROJECT_ROOT / "scenarios" / "varied.yaml"))
+    sim = FactorySim(load_scenario(PROJECT_ROOT / "scenarios" / "large" / "varied.yaml"))
     counts, single = set(), 0
     for seed in range(40):
         orders = sim.reset(seed=seed).orders
@@ -117,7 +117,7 @@ def test_varied_orders_follow_their_ranges():
 
 
 def test_orders_are_hidden_until_known():
-    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "varied.yaml", ticks_per_action=60)
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "large" / "varied.yaml", ticks_per_action=60)
     obs, _ = env.reset(seed=0)
     s = env.sim.state
     assert any(o.known_time > 0 for o in s.orders)
@@ -151,7 +151,7 @@ def test_recipes_that_can_never_run_get_no_slot():
 
 
 def test_casters_scenario_plans_casters_too():
-    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "casters.yaml", horizon=50)
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "large" / "casters.yaml", horizon=50)
     assert [k.category for k in env.kinds] == ["Caster", "Constructor", "Assembler"]
     assert env.action_space.nvec.tolist() == [1 + 3 * 2, 1 + 5 * 4, 1 + 5 * 4]
 
@@ -364,3 +364,133 @@ def test_without_partial_delivery_a_short_order_ships_nothing():
     assert d.shipped == 0 and d.revenue == 0
     assert d.penalty == 3 * 4  # every unit of the order is fined
     assert sim.state.stock[1] == 2  # the units stay in stock
+
+
+def test_a_declined_order_ships_nothing_and_leaves_its_stock():
+    small = {**TINY, "orders": {"fixed": [{"product": "B", "quantity": 2, "due_time": 5}]}}
+    for declined, shipped, left in [(False, 2, 0), (True, 0, 2)]:
+        sim = FactorySim(scenario_from_dict(small))
+        sim.reset(seed=0)
+        if declined:
+            sim.decline(0)
+        reports = [sim.step() for _ in range(5)]
+        d = reports[-1].deliveries[0]
+        assert d.shipped == shipped and d.penalty == (2 - shipped) * 4
+        assert sim.state.stock[1] == left
+
+
+def test_whole_order_bound_is_between_keep_and_the_part_order_bound():
+    from sjfactory.check import bound
+    from sjfactory.evaluate import run_episode
+
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-busy.yaml", ticks_per_action=60)
+    env.reset(seed=2000)
+    whole, part = bound(env), bound(env, whole_orders=False)
+    keep = run_episode(env, KeepPolicy(env.action_space), seed=2000).summary()["profit"]
+    assert keep < whole <= part + 1e-6
+
+
+def test_order_slack_leaves_out_orders_that_do_not_fit():
+    env = FactoryEnv(ticks_per_action=60, order_slack=True)
+    assert env.observation_space.shape[0] == FactoryEnv(ticks_per_action=60).observation_space.shape[0] + 20
+    env.reset(seed=0)
+    s = env.sim.state
+    s.stock[:] = 0
+    s.stock[env.sim.scenario.material_index["IronOre"]] = s.stock[env.sim.scenario.material_index["CopperOre"]] = 1e5
+    Order = type(s.orders[0])
+    # 10 s of every kind's time per unit (30 s on each of 3 machines): 20 units take 200 s
+    orders = [Order("Motor", 20, 250), Order("Frame", 20, 300), Order("Motor", 5, 600)]
+    slack = env.order_slack_seconds(orders)
+    # the Frames don't fit, so the last order only waits for the 20 + 5 Motors: 600 - 250 s
+    assert slack.tolist() == [50, -100, 350]
+
+
+def test_replanned_oracle_plays_a_whole_episode():
+    from sjfactory.check import oracle, play_plan, play_replanned
+
+    env = FactoryEnv(horizon=1200, ticks_per_action=60)
+    env.reset(seed=2000)
+    _, plan, _ = oracle(env, 10)
+    once = play_plan(env, 2000, plan).summary()
+    # re-planning less often than the episode is long plays the same single plan
+    assert play_replanned(env, 2000, every=20, time_limit=10).summary() == once
+    for known in (False, True):
+        assert play_replanned(env, 2000, every=5, time_limit=10, known_only=known).summary()["seconds"] == 1200
+
+
+def test_a_broken_machine_pauses_its_batch_and_resumes():
+    sim = FactorySim(scenario_from_dict(TINY))
+    sim.reset(seed=0)
+    sim.state.failures = [(1, 0, 3)]  # breaks down at second 1, out for 3 s
+    reports = [sim.step() for _ in range(6)]
+    assert [r.running[0] for r in reports] == [0, STOP, STOP, STOP, 0, 0]
+    # the 2 s batch finished at second 5 instead of 2, just in time for the order due then
+    assert reports[4].deliveries[0].shipped == 1
+
+
+def test_plans_play_through_breakdowns():
+    from sjfactory.evaluate import run_episode
+
+    env = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml", ticks_per_action=60)
+    for seed in range(3):  # a switch asked for just before a machine breaks must not fail
+        assert run_episode(env, RandomPolicy(env.action_space, seed=seed), seed=seed).summary()["seconds"] == 3600
+
+
+def test_breakdowns_do_not_change_the_orders():
+    lab = load_scenario(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml")
+    broken = load_scenario(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml")
+    a, b = FactorySim(lab), FactorySim(broken)
+    a.reset(seed=5)
+    b.reset(seed=5)
+    assert a.state.orders == b.state.orders and a.state.failures == [] and len(b.state.failures) > 0
+
+
+def test_bound_counts_breakdowns_and_stays_above_keep():
+    from sjfactory.check import bound
+    from sjfactory.evaluate import run_episode
+
+    broken = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml", ticks_per_action=60)
+    lab = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml", ticks_per_action=60)
+    for env in (broken, lab):
+        env.reset(seed=2000)
+    lower = bound(broken)
+    assert lower < bound(lab)  # same orders, less machine time
+    keep = run_episode(broken, KeepPolicy(broken.action_space), seed=2000).summary()["profit"]
+    assert keep <= lower
+
+
+def test_show_breakdowns_lets_one_model_play_days_with_and_without_them():
+    lab = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml", ticks_per_action=60, show_breakdowns=True)
+    broken = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-breakdowns.yaml", ticks_per_action=60)
+    plain = FactoryEnv(PROJECT_ROOT / "scenarios" / "lab-mixed.yaml", ticks_per_action=60)
+    assert lab.observation_space.shape == broken.observation_space.shape
+    assert lab.observation_space.shape[0] == plain.observation_space.shape[0] + lab.sim.n_machines
+    obs, _ = lab.reset(seed=0)
+    assert obs.shape == lab.observation_space.shape
+
+
+def test_demand_outlook_matches_the_average_day():
+    from sjfactory.env import expected_unannounced
+
+    sc = load_scenario(PROJECT_ROOT / "scenarios" / "lab-short.yaml")
+    outlook = expected_unannounced(sc)
+    sim = FactorySim(sc)
+    at = [0, 900, 1800, 2700]
+    seen = np.zeros(len(at))
+    for seed in range(300):
+        sim.reset(seed=seed)
+        seen += [sum(o.quantity for o in sim.state.orders if o.known_time > t) for t in at]
+    assert outlook[-1] == 0 and (np.diff(outlook) <= 0).all()
+    assert seen / 300 == pytest.approx(outlook[at], rel=0.05)
+    env = FactoryEnv(sc, ticks_per_action=60, demand_outlook=True)
+    assert env.reset(seed=0)[0].shape == env.observation_space.shape
+
+
+def test_machine_time_split_adds_up():
+    from sjfactory.check import time_split
+    from sjfactory.evaluate import run_episode
+
+    env = FactoryEnv(horizon=1800, ticks_per_action=60)
+    split = time_split(run_episode(env, KeepPolicy(env.action_space), seed=2000))
+    assert sum(split.values()) == pytest.approx(1.0)
+    assert all(v >= 0 for v in split.values()) and split["shipped"] > 0

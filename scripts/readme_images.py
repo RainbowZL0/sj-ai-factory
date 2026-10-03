@@ -33,6 +33,7 @@ def style(ax, title: str):
 def draw_profit(run: Path):
     base = json.loads((run / "baselines.json").read_text())
     model = json.loads((run / "latest_curve.json").read_text())["fixed"]
+    horizon = json.loads((run / "config.json").read_text())["horizon"]
     fig, ax = plt.subplots(figsize=(10, 4.5), dpi=160)
     for name, curve, color, label in (
         ("random", base["random"]["curve"], GRAY, "Random plans"),
@@ -44,9 +45,9 @@ def draw_profit(run: Path):
                     textcoords="offset points", color=color, va="center", fontweight="bold")
     ax.set_xlabel("Time in the episode (s)")
     ax.set_ylabel("Cash")
-    ax.set_xlim(right=5000 * 1.07)
+    ax.set_xlim(right=horizon * 1.1)
     ax.legend(frameon=False, loc="upper left")
-    style(ax, "Money over one 5000 s episode, same orders")
+    style(ax, f"Money over one {horizon} s episode, same orders")
     fig.tight_layout()
     fig.savefig(OUT / "profit.png")
 

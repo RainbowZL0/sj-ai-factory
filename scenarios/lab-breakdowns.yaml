@@ -1,0 +1,8 @@
+# Variant of lab-mixed.yaml: machines break down. Each machine fails about twice an hour at random times and is
+# then out for 1 to 5 minutes, so about 10% of machine time is lost and plans must be changed on the fly.
+# Roadmap milestone 5.
+base: lab-mixed.yaml
+
+breakdowns:
+  per_hour: 2
+  duration: [60, 300]

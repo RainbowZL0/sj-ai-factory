@@ -5,6 +5,7 @@ uv run python -m sjfactory train --steps 1000000 --note "what I changed"
 uv run python -m sjfactory eval runs/<time>-train/best_model.zip --mode sampled
 uv run python -m sjfactory view                 # open the page listing all runs
 uv run python -m sjfactory check [models ...]   # machine load, keep, oracle and upper bound, no training
+uv run python -m sjfactory bench [models ...]   # check on the fixed set of test days, one line per policy
 """
 
 from __future__ import annotations
@@ -17,9 +18,11 @@ from pathlib import Path
 
 from sjfactory import web
 from sjfactory.env import FactoryEnv
-from sjfactory.evaluate import BASELINES, MODEL_MODES, baseline_policy, cash_curve, evaluate, model_episodes, run_episode
+from sjfactory.evaluate import (
+    BASELINES, MODEL_MODES, baseline_policy, cash_curve, evaluate, model_env_options, model_episodes, run_episode,
+)
 from sjfactory.recorder import Recorder
-from sjfactory.spec import DEFAULT_SCENARIO, PROJECT_ROOT
+from sjfactory.spec import DEFAULT_SCENARIO, PROJECT_ROOT, load_scenario
 
 RUNS_DIR = PROJECT_ROOT / "runs"
 
@@ -54,10 +57,24 @@ def finish(rec: Recorder, out: Path, policy: str, args) -> Path:
     return report
 
 
-def make_env(args) -> FactoryEnv:
+def make_env(args, scenario=None) -> FactoryEnv:
     return FactoryEnv(
-        args.scenario, horizon=args.horizon, ticks_per_action=args.ticks, move_cost=getattr(args, "move_cost", 0.0)
+        scenario or args.scenario, horizon=args.horizon, ticks_per_action=args.ticks,
+        move_cost=getattr(args, "move_cost", 0.0), order_slack=getattr(args, "order_slack", False),
+        show_breakdowns=getattr(args, "show_breakdowns", False),
+        demand_outlook=getattr(args, "demand_outlook", False),
     )
+
+
+def _mixed_env(args, scenario: str, rank: int):
+    """Builds one training environment on its own scenario, seeded like make_vec_env does"""
+    def init():
+        from stable_baselines3.common.monitor import Monitor
+
+        env = Monitor(make_env(args, scenario))
+        env.action_space.seed(args.seed + rank)
+        return env
+    return init
 
 
 def base_config(args, kind: str, env: FactoryEnv) -> dict:
@@ -93,6 +110,9 @@ def cmd_train(args):
     from sjfactory.training import TrainingMonitor
 
     out = new_run_dir("train")
+    mix = [args.scenario, *args.mix]
+    # One model for days with and without breakdowns must always see the repair-time numbers
+    args.show_breakdowns = len(mix) > 1 and any(load_scenario(s).breakdowns is not None for s in mix)
     eval_env = make_env(args)
     seeds = list(range(args.test_seed, args.test_seed + args.tests))
     web.write_config(
@@ -105,6 +125,10 @@ def cmd_train(args):
         gamma=args.gamma,
         keep_bias=args.keep_bias,
         move_cost=args.move_cost,
+        order_slack=args.order_slack,
+        show_breakdowns=args.show_breakdowns,
+        demand_outlook=args.demand_outlook,
+        mix=mix if len(mix) > 1 else None,
         test_seeds=seeds,
     )
 
@@ -127,10 +151,12 @@ def cmd_train(args):
     # The model is small, so extra PyTorch threads mostly wait on each other; the cores are better spent simulating
     torch.set_num_threads(args.torch_threads)
     # Each environment runs in its own process, so the simulations run at the same time on separate cores
-    vec_env = make_vec_env(
-        lambda: make_env(args), n_envs=args.envs, seed=args.seed,
-        vec_env_cls=SubprocVecEnv if args.envs > 1 else DummyVecEnv,
-    )
+    vec_env_cls = SubprocVecEnv if args.envs > 1 else DummyVecEnv
+    if len(mix) == 1:
+        vec_env = make_vec_env(lambda: make_env(args), n_envs=args.envs, seed=args.seed, vec_env_cls=vec_env_cls)
+    else:  # environment i trains on scenario i of the mix, taking turns
+        vec_env = vec_env_cls([_mixed_env(args, mix[i % len(mix)], i) for i in range(args.envs)])
+        vec_env.seed(args.seed)
     # Rewards are rescaled by a running estimate of their spread, so the reward predictions stay in a steady range.
     # Observations are already scaled by the environment and are left alone, so a saved model needs no extra files.
     vec_env = VecNormalize(vec_env, norm_obs=False, norm_reward=True, gamma=args.gamma)
@@ -176,6 +202,10 @@ def cmd_eval(args):
     from sb3_contrib import MaskablePPO
 
     model = MaskablePPO.load(args.model)
+    options = model_env_options(args.model)
+    args.order_slack = options.get("order_slack", False)
+    args.show_breakdowns = options.get("show_breakdowns", False)
+    args.demand_outlook = options.get("demand_outlook", False)
     env = make_env(args)
     out = new_run_dir("eval")
     web.write_config(out, **base_config(args, "eval", env), model=str(args.model), mode=args.mode)
@@ -200,7 +230,16 @@ def cmd_check(args):
     run_check(
         args.scenario, args.models, range(args.first_seed, args.first_seed + args.episodes), horizon=args.horizon,
         oracle_seconds=args.oracle_seconds, lookahead_minutes=args.lookahead_minutes, workers=args.workers,
+        replan_minutes=args.replan_minutes,
     )
+
+
+def cmd_bench(args):
+    from sjfactory.check import run_bench
+
+    run_bench(args.models, oracle_seconds=args.oracle_seconds, lookahead_minutes=args.lookahead_minutes,
+              replan_minutes=args.replan_minutes,
+              workers=args.workers)
 
 
 def main():
@@ -229,6 +268,18 @@ def main():
         help="taken off the reward for each machine moved in the plan; profit is not affected",
     )
     t.add_argument("--keep-bias", type=float, default=0.0, help="how strongly a fresh model prefers the starting plan (0: no preference)")
+    t.add_argument(
+        "--order-slack", action="store_true",
+        help="also show the model, per order, the time to spare once it and the earlier orders that fit are made",
+    )
+    t.add_argument(
+        "--demand-outlook", action="store_true",
+        help="also show the model how many units a usual day still has to announce, from the scenario's order settings",
+    )
+    t.add_argument(
+        "--mix", nargs="+", default=[], metavar="SCENARIO",
+        help="also train on these scenarios, each training process on one of them in turn; tests use --scenario",
+    )
     t.add_argument("--tests", type=int, default=3, help="test episodes (seeds) per check")
     t.add_argument("--test-seed", type=int, default=1000, help="first test seed; tests use fixed orders")
     t.add_argument("--test-every", type=int, default=0, help="steps between checks (default: 20 checks per run)")
@@ -252,9 +303,20 @@ def main():
     c.add_argument("--episodes", type=int, default=10, help="seeds checked, starting at --seed")
     c.add_argument("--oracle-seconds", type=int, default=30, help="time limit per oracle solve; 0 skips the oracle")
     c.add_argument("--lookahead-minutes", type=int, default=30, help="look-ahead planner's window; 0 skips it")
+    c.add_argument("--replan-minutes", type=int, default=0,
+                   help="also play the oracle re-planned every this many minutes (slow); 0 (default) skips it")
     c.add_argument("--workers", type=int, default=None, help="processes (default: one per episode, up to the cores)")
     c.add_argument("--first-seed", type=int, default=2000, help="first seed; no training run tests on 2000 and up")
     c.set_defaults(func=cmd_check)
+
+    b = sub.add_parser("bench", help="check on the fixed set of test days; one share of the bound per kind of day")
+    b.add_argument("models", nargs="*", help="trained models; each plays the scenarios it fits")
+    b.add_argument("--oracle-seconds", type=int, default=30, help="time limit per oracle solve; 0 skips the oracle")
+    b.add_argument("--lookahead-minutes", type=int, default=0, help="look-ahead planner's window; 0 (default) skips it")
+    b.add_argument("--replan-minutes", type=int, default=5,
+                   help="also play the oracle re-planned every this many minutes; 0 skips it")
+    b.add_argument("--workers", type=int, default=None, help="processes (default: one per episode, up to the cores)")
+    b.set_defaults(func=cmd_bench)
 
     args = p.parse_args()
     args.func(args)
